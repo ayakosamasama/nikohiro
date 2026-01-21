@@ -157,42 +157,34 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
         else if (selectedType === "shape_10frame") {
             const count = Math.floor(Math.random() * 9) + 1; // 1-9
             const remaining = 10 - count;
-            q = "あといくつで 10 になる？";
+            q = "あと いくつで 10 になるかな？";
             a = remaining.toString();
             visual = { type: "10frame", count };
             choices = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
         }
         else if (selectedType === "shape_blocks") {
             const count = Math.floor(Math.random() * 5) + 3; // 3-7
-            q = "積み木は 全部でいくつある？";
+            q = "つみきは ぜんぶで いくつあるかな？";
             a = count.toString();
             visual = { type: "blocks", count };
             choices = ["3", "4", "5", "6", "7", "8"];
         }
         else if (selectedType === "lang_opposites") {
             const pairs = [
-                { q: "「大きい」の反対は？", a: "ちいさい", c: ["ちいさい", "ながい", "おもい"] },
-                { q: "「長い」の反対は？", a: "みじかい", c: ["みじかい", "ひくい", "おそい"] },
-                { q: "「重い」の反対は？", a: "かるい", c: ["かるい", "あかるい", "はやい"] },
-                { q: "「明るい」の反対は？", a: "くらい", c: ["くらい", "さむい", "きれいい"] },
-                { q: "「高い」の反対は？", a: "ひくい", c: ["ひくい", "ふとい", "おもい"] }
+                { q: "「おおきい」の はんたいは？", a: "ちいさい", c: ["ちいさい", "ながい", "おもい"] },
+                { q: "「ながい」の はんたいは？", a: "みじかい", c: ["みじかい", "ひくい", "おそい"] },
+                { q: "「おもい」の はんたいは？", a: "かるい", c: ["かるい", "あかるい", "はやい"] },
+                { q: "「あかるい」の はんたいは？", a: "くらい", c: ["くらい", "さむい", "きれい"] },
+                { q: "「たかい」の はんたいは？", a: "ひくい", c: ["ひくい", "ふとい", "おもい"] }
             ];
             const pick = pairs[Math.floor(Math.random() * pairs.length)];
             q = pick.q; a = pick.a; choices = pick.c;
         }
         else if (selectedType === "lang_odd_one") {
             const sets = [
-                { q: "なかまはずれは どれ？", a: "くるま", c: ["りんご", "みかん", "くるま", "バナナ"] },
-                { q: "なかまはずれは どれ？", a: "ねこ", c: ["えんぴつ", "ねこ", "消しゴム", "ノート"] },
-                { q: "なかまはずれは どれ？", a: "ひこうき", c: ["サメ", "くじら", "ひこうき", "イルカ"] }
-            ];
-            const pick = sets[Math.floor(Math.random() * sets.length)];
-            q = pick.q; a = pick.a; choices = pick.c;
-        }
-        else if (selectedType === "sci_sequence") {
-            const sets = [
-                { q: "花がさくまでの 順番は？", a: "種→芽→花", c: ["種→芽→花", "芽→種→花", "花→芽→種"] },
-                { q: "ごはんを食べる 順番は？", a: "用意→食べる→片付け", c: ["食べる→用意→片付け", "用意→食べる→片付け", "片付け→用意→食べる"] }
+                { q: "なかまはずれは どれかな？", a: "くるま", c: ["りんご", "みかん", "くるま", "バナナ"] },
+                { q: "なかまはずれは どれかな？", a: "ねこ", c: ["えんぴつ", "ねこ", "けしゴム", "ノート"] },
+                { q: "なかまはずれは どれかな？", a: "ひこうき", c: ["サメ", "くじら", "ひこうき", "イルカ"] }
             ];
             const pick = sets[Math.floor(Math.random() * sets.length)];
             q = pick.q; a = pick.a; choices = pick.c;
@@ -332,7 +324,7 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
                     background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100
                 }}>
                     <div style={{ background: "white", padding: "25px", borderRadius: "25px", textAlign: "center", width: "95%", maxWidth: "380px", boxShadow: "0 15px 50px rgba(0,0,0,0.3)" }}>
-                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>ニコニコクイズ！</h3>
+                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>にこにこクイズ！</h3>
 
                         <p style={{ fontSize: "1.2rem", fontWeight: "bold", marginBottom: "10px" }}>{currentQuiz.q}</p>
 

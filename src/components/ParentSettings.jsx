@@ -301,17 +301,6 @@ export default function ParentSettings({ isOpen, onClose }) {
                                     </div>
                                 </section>
 
-                                {/* 3. Science */}
-                                <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
-                                    <h4 style={{ margin: "0 0 15px 0", color: "#27ae60", borderBottom: "2px solid #dcfce7", display: "inline-block" }}>🌱 科学・せいかつ</h4>
-                                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
-                                            <input type="checkbox" checked={quizSettings.types?.includes("sci_sequence")} onChange={() => toggleArrayItem("types", "sci_sequence")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
-                                            じゅんばん並べ
-                                        </label>
-                                    </div>
-                                </section>
-
                                 <button onClick={handleSaveQuiz} disabled={loading} className="btn btn-primary" style={{ width: "100%", padding: "12px", fontSize: "1.1rem" }}>
                                     設定を保存する
                                 </button>
