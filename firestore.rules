@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // helper function to check if user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // helper function to check if user is accessing their own document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // helper function to check if user has admin role
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --- Users Collection ---
+    // Anyone signed in can read profiles (needed for posts/groups)
+    // Only owner can write/update their own profile
+    // Admin can write (though mostly done via Server API, enabling here allows client-side admin too if needed)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId); // User creation on signup
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin(); // Only admin (or owner via account delete)
+
+      // Subcollection: Joined Groups
+      match /joinedGroups/{groupId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // --- Groups Collection ---
+    // Anyone signed in can view groups
+    // Only Admin can create/update/delete groups
+    match /groups/{groupId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      // Subcollection: Members
+      // Users can add/remove themselves
+      match /members/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // --- Posts Collection ---
+    // Anyone signed in can read
+    // Authenticated users can create
+    // Owner or Admin can delete
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(request.resource.data.userId) || isAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // --- Requests (Inquiries/Applications) ---
+    // Users can create their own requests
+    // Only Admin can read all requests or delete them
+    // Owner can read their own
+    match /requests/{requestId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+      allow update: if isAdmin(); // Case resolved, etc
+    }
+
+    // --- System / Safety (NG Words) ---
+    // Authenticated users can read (for client-side check)
+    // Only Admin can write
+    match /system/safety {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

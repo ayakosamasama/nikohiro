@@ -1,0 +1,119 @@
+import { db } from "../lib/firebase";
+import { collection, doc, getDocs, setDoc, deleteDoc, onSnapshot, query, where, getDoc } from "firebase/firestore";
+
+const GROUPS_COLLECTION = "groups";
+const MEMBERS_COLLECTION = "members";
+
+// Initialize default groups if they don't exist
+const DEFAULT_GROUPS = [
+    { id: "game", name: "ゲーム", emoji: "🎮", color: "#FF6B6B" },
+    { id: "drawing", name: "おえかき", emoji: "🎨", color: "#FF9F43" },
+    { id: "cooking", name: "おりょうり", emoji: "🍳", color: "#FECA57" },
+    { id: "lego", name: "レゴ・ブロック", emoji: "🧱", color: "#1DD1A1" },
+    { id: "book", name: "ほん", emoji: "📚", color: "#54A0FF" },
+    { id: "music", name: "おんがく", emoji: "🎵", color: "#FF9FF3" },
+];
+
+export const initGroups = async () => {
+    for (const group of DEFAULT_GROUPS) {
+        const groupRef = doc(db, GROUPS_COLLECTION, group.id);
+        const docSnap = await getDoc(groupRef);
+        if (!docSnap.exists()) {
+            await setDoc(groupRef, group);
+        }
+    }
+};
+
+export const subscribeToGroups = (callback) => {
+    // Ensure init runs once (simplified)
+    initGroups();
+
+    return onSnapshot(collection(db, GROUPS_COLLECTION), (snapshot) => {
+        const groups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(groups);
+    });
+};
+
+export const joinGroup = async (userId, groupId) => {
+    await setDoc(doc(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION, userId), {
+        joinedAt: new Date()
+    });
+};
+
+export const leaveGroup = async (userId, groupId) => {
+    await deleteDoc(doc(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION, userId));
+};
+
+export const subscribeToUserGroups = (userId, callback) => {
+    // Can't easily query "all subcollections" in Firestore without Collection Group Queries usually.
+    // For this simple app, we'll fetch all groups and then check if the user is a member of each.
+    // OR simpler: Store "joinedGroups" in the user profile. 
+    // Let's do the "fetch all groups and check membership" for now, or just store a list of joined GroupIDs locally/in user doc?
+
+    // Alternative: Subcollection 'members' is good for scalability (many members), but hard to list "my groups".
+    // Let's use a simpler approach for "My Groups": A subcollection in USER doc.
+
+    return onSnapshot(collection(db, "users", userId, "joinedGroups"), (snapshot) => {
+        const groupIds = snapshot.docs.map(doc => doc.id);
+        callback(groupIds);
+    });
+};
+
+// Updated Join/Leave to update User's subcollection too
+export const toggleGroupMembership = async (userId, groupId, isJoining) => {
+    if (isJoining) {
+        // Add to group's members
+        await setDoc(doc(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION, userId), { joinedAt: new Date() });
+        // Add to user's joinedGroups
+        await setDoc(doc(db, "users", userId, "joinedGroups", groupId), { joinedAt: new Date() });
+    } else {
+        // Remove from both
+        await deleteDoc(doc(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION, userId));
+        await deleteDoc(doc(db, "users", userId, "joinedGroups", groupId));
+    }
+};
+// Admin: Create Group
+export const createGroup = async (id, name, emoji, color) => {
+    await setDoc(doc(db, GROUPS_COLLECTION, id), {
+        name,
+        emoji,
+        color
+    });
+};
+
+// Admin: Update Group
+export const updateGroup = async (id, data) => {
+    await setDoc(doc(db, GROUPS_COLLECTION, id), data, { merge: true });
+};
+
+// Admin: Delete Group
+export const deleteGroup = async (id) => {
+    await deleteDoc(doc(db, GROUPS_COLLECTION, id));
+};
+
+// Admin: Get Group Members
+export const getGroupMembers = async (groupId) => {
+    const membersSnap = await getDocs(collection(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION));
+    // Ideally we would fetch user details for each member, but for now just returning IDs and joinedAt
+    // To make it useful, we should probably fetch the user profiles.
+
+    const memberPromises = membersSnap.docs.map(async (memberDoc) => {
+        const uid = memberDoc.id;
+        const joinedAt = memberDoc.data().joinedAt;
+        // Fetch user profile
+        const userSnap = await getDoc(doc(db, "users", uid));
+        if (!userSnap.exists()) return null; // Filter out if user doesn't exist
+
+        const userData = userSnap.data();
+        return {
+            uid,
+            joinedAt,
+            displayName: userData.displayName || "Unknown",
+            email: userData.email, // If needed
+            photoURL: userData.photoURL
+        };
+    });
+
+    const results = await Promise.all(memberPromises);
+    return results.filter(member => member !== null);
+};
