@@ -23,6 +23,7 @@ export default function Home() {
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups'
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
 
   // Fetch joined groups for authenticated user
   useEffect(() => {
@@ -116,7 +117,7 @@ export default function Home() {
           <GroupList />
         ) : (
           <>
-            <PostForm userGroups={joinedGroupIds} />
+            {/* Timeline Filter and List */}
 
             {/* Filter Tabs (Horizontal Scroll) */}
             <div style={{ margin: "20px -20px", padding: "0 20px", overflowX: "auto", display: "flex", gap: "10px", scrollbarWidth: "none" }}>
@@ -160,6 +161,62 @@ export default function Home() {
             <Timeline filterMode={filterMode} userGroups={joinedGroupIds} selectedGroupId={selectedGroupId} />
           </>
         )}
+
+        {/* Floating Action Button (FAB) for Post */}
+        {activeTab === "home" && (
+          <button
+            onClick={() => setIsPostModalOpen(true)}
+            style={{
+              position: "fixed",
+              bottom: "30px",
+              right: "30px",
+              width: "65px",
+              height: "65px",
+              borderRadius: "50%",
+              background: "var(--primary)",
+              color: "white",
+              border: "none",
+              boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "2rem",
+              cursor: "pointer",
+              zIndex: 100,
+              transition: "transform 0.2s"
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
+            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+            title="きもちを投稿する"
+          >
+            ✏️
+          </button>
+        )}
+
+        {/* Post Modal Overlay */}
+        {isPostModalOpen && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000, padding: "20px"
+          }}>
+            <div style={{ width: "100%", maxWidth: "500px", animation: "modalIn 0.3s ease" }}>
+              <PostForm
+                userGroups={joinedGroupIds}
+                onClose={() => setIsPostModalOpen(false)}
+                onSuccess={() => setIsPostModalOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        <style jsx global>{`
+          @keyframes modalIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+        `}</style>
       </div>
     );
   }
