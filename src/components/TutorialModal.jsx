@@ -221,7 +221,7 @@ export default function TutorialModal({ isOpen, onClose }) {
                 // If rect exists: position relative to it (pixels). If not: center of screen.
                 top: rect ? (rect.top > window.innerHeight / 2 ? "auto" : `${rect.bottom + 20}px`) : "50%",
                 bottom: rect ? (rect.top > window.innerHeight / 2 ? `${window.innerHeight - rect.top + 20}px` : "auto") : "auto",
-                left: rect ? `${rect.left + rect.width / 2}px` : "50%",
+                left: "50%",
                 transform: "translateX(-50%)" + (rect ? "" : " translateY(-50%)"),
                 background: "#ffffff",
                 color: "#333333",
