@@ -165,6 +165,7 @@ export default function Home() {
         {/* Floating Action Button (FAB) for Post */}
         {activeTab === "home" && (
           <button
+            id="tutorial-post-fab"
             onClick={() => setIsPostModalOpen(true)}
             style={{
               position: "fixed",

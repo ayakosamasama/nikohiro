@@ -37,11 +37,25 @@ const TUTORIAL_STEPS = [
         action: "click"
     },
     {
-        title: "3. テスト投稿",
-        content: "「🏠 ひろば」に戻ってきました。\nここで「きょうのきもちは？」から絵文字を選んで投稿できます。\n（※実際には投稿せずに次へ進みます）",
+        title: "3. きもちを投稿する",
+        content: "ひろばに戻ったら、右下の「✏️（えんぴつ）」ボタンを押して、今のきもちを書いてみましょう。",
+        emoji: "✏️",
+        targetId: "tutorial-post-fab",
+        action: "click"
+    },
+    {
+        title: "きもちをえらぶ",
+        content: "ここで絵文字を選んだり、メッセージを書いたりできます。\n（※実際には投稿せずに次へ進みます）",
         emoji: "📝",
         targetId: "tutorial-mood-area",
         action: "next"
+    },
+    {
+        title: "とじてみる",
+        content: "一度、右上の「×」ボタンを押して画面を閉じてみましょう。",
+        emoji: "✖️",
+        targetId: "tutorial-post-close-btn",
+        action: "click"
     },
     {
         title: "4. 保護者用管理機能",

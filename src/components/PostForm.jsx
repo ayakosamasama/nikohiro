@@ -204,6 +204,7 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
                     </small>
                     {onClose && (
                         <button
+                            id="tutorial-post-close-btn"
                             onClick={onClose}
                             style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", color: "#636e72" }}
                         >
