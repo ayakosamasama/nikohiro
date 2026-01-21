@@ -3,6 +3,7 @@ import { db } from "../lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import { addPost } from "../services/postService";
+import { LANGUAGE_QUIZZES } from "../data/quizData";
 import { useAuth } from "../context/AuthContext";
 import { containsNgWord } from "../utils/safetyCheck";
 
@@ -170,23 +171,13 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
             choices = ["3", "4", "5", "6", "7", "8"];
         }
         else if (selectedType === "lang_opposites") {
-            const pairs = [
-                { q: "「おおきい」の はんたいは？", a: "ちいさい", c: ["ちいさい", "ながい", "おもい"] },
-                { q: "「ながい」の はんたいは？", a: "みじかい", c: ["みじかい", "ひくい", "おそい"] },
-                { q: "「おもい」の はんたいは？", a: "かるい", c: ["かるい", "あかるい", "はやい"] },
-                { q: "「あかるい」の はんたいは？", a: "くらい", c: ["くらい", "さむい", "きれい"] },
-                { q: "「たかい」の はんたいは？", a: "ひくい", c: ["ひくい", "ふとい", "おもい"] }
-            ];
-            const pick = pairs[Math.floor(Math.random() * pairs.length)];
+            const list = LANGUAGE_QUIZZES.opposites;
+            const pick = list[Math.floor(Math.random() * list.length)];
             q = pick.q; a = pick.a; choices = pick.c;
         }
         else if (selectedType === "lang_odd_one") {
-            const sets = [
-                { q: "なかまはずれは どれかな？", a: "くるま", c: ["りんご", "みかん", "くるま", "バナナ"] },
-                { q: "なかまはずれは どれかな？", a: "ねこ", c: ["えんぴつ", "ねこ", "けしゴム", "ノート"] },
-                { q: "なかまはずれは どれかな？", a: "ひこうき", c: ["サメ", "くじら", "ひこうき", "イルカ"] }
-            ];
-            const pick = sets[Math.floor(Math.random() * sets.length)];
+            const list = LANGUAGE_QUIZZES.oddOneOut;
+            const pick = list[Math.floor(Math.random() * list.length)];
             q = pick.q; a = pick.a; choices = pick.c;
         }
 
