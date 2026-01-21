@@ -9,57 +9,59 @@ import { containsNgWord } from "../utils/safetyCheck";
 
 const MOODS = [
     { emoji: "😊", label: "にこにこ", message: "きょうもにこにこ元気だよ！" },
-    { emoji: "😆", label: "さいこう", message: "すっごくたのしい！さいこうの気分！" },
+    { emoji: "😆", label: "さいこう", message: "すっごくたのしい！さいこうのきぶん！" },
     { emoji: "🎉", label: "わくわく", message: "なにかいいことがありそう！わくわく！" },
     { emoji: "😲", label: "びっくり", message: "ええーっ！びっくりしたなぁ" },
     { emoji: "🤔", label: "ふむふむ", message: "なるほど…どうしてだろう？" },
-    { emoji: "😢", label: "しくしく", message: "ちょっぴりかなしい気持ち…" },
-    { emoji: "😭", label: "えーん", message: "悲しいことがあったの…えーん" },
+    { emoji: "😢", label: "しくしく", message: "ちょっぴりかなしいきもち…" },
+    { emoji: "😭", label: "えーん", message: "かなしいことがあったの…えーん" },
     { emoji: "😡", label: "ぷんぷん", message: "もう！おこってるんだから！" },
-    { emoji: "😤", label: "ふんっ", message: "ふんだ！文句ある？" },
-    { emoji: "😴", label: "すやすや", message: "ふわぁ…眠くなってきたかも" },
-    { emoji: "😷", label: "ぐったり", message: "ちょっと調子が悪いかも…" },
-    { emoji: "😎", label: "きりっ", message: "かっこよく決めてみたよ！" },
+    { emoji: "😤", label: "ふんっ", message: "ふんだ！もんくある？" },
+    { emoji: "😴", label: "すやすや", message: "ふわぁ…ねむくなってきたかも" },
+    { emoji: "😷", label: "ぐったり", message: "ちょっとちょうしがわるいかも…" },
+    { emoji: "😎", label: "きりっ", message: "かっこよくきめてみたよ！" },
     { emoji: "🥳", label: "おめでとう", message: "やったー！おめでとう！" },
-    { emoji: "😱", label: "ガーン", message: "ショック！信じられない…" },
-    { emoji: "🤗", label: "ぎゅっ", message: "仲良し！ぎゅーっとしたい気分" },
-    { emoji: "😋", label: "ペロリ", message: "おいしそう！ペロリと食べちゃいたい" },
-    { emoji: "😍", label: "だいすき", message: "目がハートになっちゃう！だいすき！" },
-    { emoji: "😇", label: "てんし", message: "いいことして、やさしい気分" },
-    { emoji: "🤪", label: "あっかんべー", message: "変な顔しちゃお！あっかんべー" },
+    { emoji: "😱", label: "ガーン", message: "ショック！しんじられない…" },
+    { emoji: "🤗", label: "ぎゅっ", message: "なかよし！ぎゅーっとしたいきぶん" },
+    { emoji: "😋", label: "ペロリ", message: "おいしそう！ペロリとたべちゃいたい" },
+    { emoji: "😍", label: "だいすき", message: "めがハートになっちゃう！だいすき！" },
+    { emoji: "😇", label: "てんし", message: "いいことして、やさしいきぶん" },
+    { emoji: "🤪", label: "あっかんべー", message: "へんなかおしちゃお！あっかんべー" },
     { emoji: "🤐", label: "ないしょ", message: "これはヒミツ！ナイショだよ" },
-    { emoji: "🤒", label: "おねつ", message: "げんきないよー...お熱があるかも" },
-    { emoji: "🤕", label: "いたい", message: "痛いよ〜...怪我しちゃった" },
-    { emoji: "🤢", label: "きもちわるい", message: "ううっ...気持ち悪いかも" },
-    { emoji: "🤧", label: "ハクション", message: "ハクション！風邪ひいたかな？" },
-    { emoji: "🥵", label: "あつい", message: "ふぅ...今日は暑すぎるよ〜" },
-    { emoji: "🥶", label: "さむい", message: "ブルブル...寒くて凍えそう" },
+    { emoji: "🤒", label: "おねつ", message: "げんきないよー...おねつがあるかも" },
+    { emoji: "🤕", label: "いたい", message: "いたいよ〜...けがしちゃった" },
+    { emoji: "🤢", label: "きもちわるい", message: "ううっ...きもちわるいかも" },
+    { emoji: "🤧", label: "ハクション", message: "ハクション！かぜひいたかな？" },
+    { emoji: "🥵", label: "あつい", message: "ふぅ...きょうはあつすぎるよ〜" },
+    { emoji: "🥶", label: "さむい", message: "ブルブル...さむくてこおえそう" },
     { emoji: "🥺", label: "ぴえん", message: "ぴえん...かまってほしいな" },
-    { emoji: "🤠", label: "カウボーイ", message: "冒険に出発だ！ヒヒーン！" },
-    { emoji: "👽", label: "うちゅうじん", message: "ワレワレハ宇宙人ダ..." },
+    { emoji: "🤠", label: "カウボーイ", message: "ぼうけんにしゅっぱつだ！ヒヒーン！" },
+    { emoji: "👽", label: "うちゅうじん", message: "ワレワレハうちゅうじんダ..." },
     { emoji: "🤖", label: "ロボット", message: "ウィーン...ガシャン...ロボットだよ" },
     { emoji: "👻", label: "おばけ", message: "うらめしや〜...おばけだぞ〜" },
     { emoji: "👍", label: "いい", message: "いいね！バッチリだよ！" },
-    { emoji: "👎", label: "やだ", message: "うーん、それはちょっと違うかも" },
-    { emoji: "👊", label: "パンチ", message: "やる気満々！負けないぞ！" },
+    { emoji: "👎", label: "やだ", message: "うーん、それはちょっとちがうかも" },
+    { emoji: "👊", label: "パンチ", message: "やるきまんまん！まけないぞ！" },
     { emoji: "✌️", label: "ピース", message: "イェーイ！ピース！" },
     { emoji: "👋", label: "バイバイ", message: "またね！バイバーイ！" },
-    { emoji: "💪", label: "パワー", message: "力がみなぎってきた！パワー！" },
-    { emoji: "👐", label: "パァ", message: "パァ！明るい気分！" },
+    { emoji: "💪", label: "パワー", message: "ちからがみなぎってきた！パワー！" },
+    { emoji: "👐", label: "パァ", message: "パァ！あかるいきぶん！" },
     { emoji: "🙌", label: "ばんざい", message: "やったー！ばんざーい！" },
     { emoji: "👏", label: "パチパチ", message: "すごいすごい！パチパチパチ！" },
-    { emoji: "🙏", label: "おねがい", message: "神様仏様！おねがいします！" },
-    { emoji: "👀", label: "じーっ", message: "じーっ...気になって見てるよ" },
-    { emoji: "💋", label: "ちゅっ", message: "大好きのしるし！ちゅっ！" },
-    { emoji: "💔", label: "ハートブレイク", message: "心が折れそう...ショック" },
-    { emoji: "🎵", label: "ルンルン", message: "鼻歌歌っちゃう！ルンルン気分" },
-    { emoji: "💩", label: "うんち", message: "うんち！...なんて言ってみたり" },
+    { emoji: "🙏", label: "おねがい", message: "かみさまほとけさま！おねがいします！" },
+    { emoji: "👀", label: "じーっ", message: "じーっ...きになってみてるよ" },
+    { emoji: "💋", label: "ちゅっ", message: "だいすきのしるし！ちゅっ！" },
+    { emoji: "💔", label: "ハートブレイク", message: "こころがおれそう...ショック" },
+    { emoji: "🎵", label: "ルンルン", message: "はなうたうたっちゃう！ルンルンきぶん" },
+    { emoji: "💩", label: "うんち", message: "うんち！...なんていってみたり" },
 ];
 
 import { subscribeToNgWords } from "../services/adminService";
+import { grantPostRewards } from "../services/gameService";
+import RewardModal from "./RewardModal";
 // ... imports
 
-export default function PostForm({ userGroups = [], onClose, onSuccess }) {
+export default function PostForm({ userGroups = [], onClose, onSuccess, isTutorialMode = false }) {
     const { user } = useAuth();
     const [text, setText] = useState("");
     const [selectedMood, setSelectedMood] = useState(MOODS[0]);
@@ -68,6 +70,10 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
     const [currentQuiz, setCurrentQuiz] = useState({ q: "", a: 0 });
     const [name, setName] = useState("");
     const [quizSettings, setQuizSettings] = useState({ maxAnswer: 2, operations: ["add"] });
+
+    // Reward State
+    const [rewardData, setRewardData] = useState(null);
+    const [showReward, setShowReward] = useState(false);
 
     // NG Words state
     const [ngWords, setNgWords] = useState([]);
@@ -99,12 +105,44 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
 
     // ... existing profile useEffect
 
+    const executePost = async () => {
+        try {
+            const postName = name || (user.email ? user.email.split("@")[0] : "ゲスト");
+            const postIcon = user.photoURL || null;
+            await addPost(user.uid, postName, postIcon, selectedMood, text, userGroups, user.affiliationId);
+
+            // Grant Rewards (Game Logic)
+            const reward = await grantPostRewards(user.uid);
+
+            if (isTutorialMode) {
+                // Skip reward screen during tutorial
+                if (onSuccess) onSuccess();
+            } else {
+                setRewardData(reward);
+                setShowReward(true);
+            }
+
+        } catch (error) {
+            alert("とうこうできませんでした");
+            console.error(error);
+        }
+    };
+
     const handlePostClick = () => {
-        if (!text.trim()) return;
+        if (!text.trim()) {
+            alert("メッセージを かいてみてね！");
+            return;
+        }
 
         // Safety check with dynamic list
         if (containsNgWord(text, ngWords)) {
             alert("「ちくちくことば」がつかわれているかもしれません。\nやさしいことばになおしてみよう！");
+            return;
+        }
+
+        // TUTORIAL SPECIAL PATH: Bypass Quiz
+        if (isTutorialMode) {
+            executePost();
             return;
         }
 
@@ -206,20 +244,18 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
         const answerToCheck = choiceValue !== null ? choiceValue : quizAnswer;
         if (answerToCheck.toString() === currentQuiz.a.toString()) {
             setIsQuizOpen(false);
-            try {
-                const postName = name || (user.email ? user.email.split("@")[0] : "ゲスト");
-                const postIcon = user.photoURL || null;
-                await addPost(user.uid, postName, postIcon, selectedMood, text, userGroups);
-                setText("");
-                setQuizAnswer("");
-                if (onSuccess) onSuccess();
-            } catch (error) {
-                alert("とうこうできませんでした");
-            }
+            executePost();
         } else {
             alert("ざんねん！もういちどチャレンジしてね");
             setQuizAnswer("");
         }
+    };
+
+    const handleRewardClose = () => {
+        setShowReward(false);
+        setText("");
+        setQuizAnswer("");
+        if (onSuccess) onSuccess(); // Close the Post Modal
     };
 
     const renderQuizVisual = () => {
@@ -320,7 +356,11 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
             />
 
             <div style={{ textAlign: "right" }}>
-                <button className="btn btn-primary" onClick={handlePostClick}>
+                <button
+                    id="tutorial-post-submit"
+                    className="btn btn-primary"
+                    onClick={handlePostClick}
+                >
                     とうこうする
                 </button>
             </div>
@@ -374,6 +414,15 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
                     </div>
                 </div>
             )}
+
+            {showReward && (
+                <RewardModal
+                    show={showReward}
+                    data={rewardData}
+                    onClose={handleRewardClose}
+                />
+            )}
         </div>
     );
 }
+

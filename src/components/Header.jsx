@@ -6,7 +6,7 @@ import ProfileSettings from "./ProfileSettings";
 import ParentSettings from "./ParentSettings";
 
 export default function Header() {
-    const { user, logout } = useAuth();
+    const { user, isAdmin, logout } = useAuth();
     const router = useRouter();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isParentSettingsOpen, setIsParentSettingsOpen] = useState(false);
@@ -41,7 +41,7 @@ export default function Header() {
                     >
                         おうちのひとへ
                     </button>
-                    {user.isAdmin && (
+                    {isAdmin && (
                         <button
                             onClick={() => router.push("/admin")}
                             style={{
@@ -96,7 +96,8 @@ export default function Header() {
                     <ProfileSettings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
                     <ParentSettings isOpen={isParentSettingsOpen} onClose={() => setIsParentSettingsOpen(false)} />
                 </div>
-            )}
-        </header>
+            )
+            }
+        </header >
     );
 }

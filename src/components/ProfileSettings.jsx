@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { getUserProfile, updateUserProfile } from "../services/userService";
 import { updateProfile } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { PETS, getLevelFromXP } from "../data/gameData";
+import PetDisplay from "./PetDisplay";
 
 const THEME_COLORS = [
     { id: "red", value: "#FF6B6B", name: "あか" },
@@ -33,12 +35,22 @@ const getEmojiUrl = (emoji) => {
 };
 
 export default function ProfileSettings({ isOpen, onClose }) {
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
     const [displayName, setDisplayName] = useState("");
     const [themeColor, setThemeColor] = useState("orange"); // default
     const [photoURL, setPhotoURL] = useState(null);
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState("かお"); // Default tab
+
+
+    // Gamification State
+    const [xp, setXp] = useState(0);
+    const [level, setLevel] = useState(1);
+    const [pet, setPet] = useState(null);
+    const [unlockedPetImages, setUnlockedPetImages] = useState([]);
+    const [showPets, setShowPets] = useState(true);
+
+    const [mainTab, setMainTab] = useState("profile"); // Deprecated: Only "profile" remains
+    const [activeTab, setActiveTab] = useState("かお"); // Icon tab
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -50,6 +62,14 @@ export default function ProfileSettings({ isOpen, onClose }) {
                         setThemeColor(profile.themeColor || "orange");
                         if (profile.photoURL) {
                             setPhotoURL(profile.photoURL);
+                        }
+                        // Game Data
+                        setXp(profile.experience || 0);
+                        setLevel(profile.level || 1);
+                        setPet(profile.pet || null);
+                        setUnlockedPetImages(profile.unlockedPetImages || []);
+                        if (profile.settings?.showPets !== undefined) {
+                            setShowPets(profile.settings.showPets);
                         }
                     }
                 } catch (error) {
@@ -81,12 +101,12 @@ export default function ProfileSettings({ isOpen, onClose }) {
             // Update local CSS variable immediately
             document.documentElement.style.setProperty("--primary", `var(--color-${themeColor})`);
 
-            alert("設定を保存しました！");
+            alert("ほぞん したよ！");
+            await refreshProfile(); // Refresh context
             onClose();
-            window.location.reload(); // Reload to reflect changes in Header/AuthContext
         } catch (error) {
             console.error(error);
-            alert("保存に失敗しました");
+            alert("しっぱい しちゃった...");
         } finally {
             setSaving(false);
         }
@@ -106,123 +126,143 @@ export default function ProfileSettings({ isOpen, onClose }) {
                 border: "4px solid var(--primary)",
                 maxHeight: "90vh", overflowY: "auto"
             }}>
-                <h2 style={{ textAlign: "center", color: "var(--primary)", marginBottom: "20px" }}>
-                    プロフィール設定
+                <h2 style={{ textAlign: "center", marginBottom: "20px", color: "var(--primary)" }}>
+                    {mainTab === "profile" ? "⚙️ せってい" : "ペット"}
                 </h2>
 
-                <div style={{ marginBottom: "20px" }}>
-                    <label style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
-                        おなまえ（ニックネーム）
-                    </label>
-                    <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        style={{
-                            width: "100%", padding: "10px", fontSize: "1.2rem",
-                            borderRadius: "10px", border: "2px solid #ccc"
-                        }}
-                    />
-                </div>
+                <h3 style={{ textAlign: "center", marginBottom: "20px", color: "var(--primary)" }}>プロフィール</h3>
 
-                <div style={{ marginBottom: "20px" }}>
-                    <label style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
-                        アイコンをえらぶ
-                    </label>
-
-                    {/* Category Tabs */}
-                    <div style={{ display: "flex", gap: "5px", marginBottom: "10px", flexWrap: "wrap" }}>
-                        {Object.keys(ICON_CATEGORIES).map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveTab(cat)}
+                {mainTab === "profile" && (
+                    <>
+                        <div style={{ marginBottom: "20px" }}>
+                            おなまえ
+                            <input
+                                type="text"
+                                value={displayName}
+                                onChange={(e) => setDisplayName(e.target.value)}
                                 style={{
-                                    padding: "5px 10px",
-                                    borderRadius: "15px",
-                                    border: "none",
-                                    backgroundColor: activeTab === cat ? "var(--primary)" : "#eee",
-                                    color: activeTab === cat ? "white" : "#555",
-                                    fontWeight: "bold",
-                                    cursor: "pointer",
-                                    fontSize: "0.9rem"
+                                    width: "100%", padding: "10px", fontSize: "1.2rem",
+                                    borderRadius: "10px", border: "2px solid #ccc"
                                 }}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div style={{
-                        display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px",
-                        maxHeight: "200px", overflowY: "auto", padding: "5px"
-                    }}>
-                        {ICON_CATEGORIES[activeTab].map((emoji) => {
-                            const url = getEmojiUrl(emoji);
-                            return (
-                                <img
-                                    key={emoji}
-                                    src={url}
-                                    onClick={() => setPhotoURL(url)}
-                                    style={{
-                                        width: "100%", aspectRatio: "1/1",
-                                        cursor: "pointer",
-                                        border: photoURL === url ? "4px solid var(--primary)" : "2px solid transparent",
-                                        borderRadius: "10px",
-                                        padding: "2px",
-                                        transition: "transform 0.1s"
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div style={{ marginBottom: "30px" }}>
-                    <label style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
-                        テーマカラー
-                    </label>
-                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
-                        {THEME_COLORS.map(c => (
-                            <button
-                                key={c.id}
-                                onClick={() => setThemeColor(c.id)}
-                                style={{
-                                    width: "40px", height: "40px", borderRadius: "50%",
-                                    backgroundColor: c.value,
-                                    border: themeColor === c.id ? "4px solid #333" : "none",
-                                    cursor: "pointer",
-                                    transform: themeColor === c.id ? "scale(1.1)" : "scale(1)"
-                                }}
-                                title={c.name}
                             />
-                        ))}
-                    </div>
-                </div>
+                        </div>
 
-                <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                        id="tutorial-settings-close-btn"
-                        onClick={onClose}
-                        style={{
-                            flex: 1, padding: "10px", borderRadius: "10px",
-                            border: "none", backgroundColor: "#ccc",
-                            fontWeight: "bold", cursor: "pointer"
-                        }}
-                    >
-                        キャンセル
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="btn"
-                        style={{
-                            flex: 2, padding: "10px", borderRadius: "10px",
-                            border: "none", backgroundColor: "var(--primary)",
-                            color: "white", fontWeight: "bold", cursor: "pointer",
-                            opacity: saving ? 0.7 : 1
-                        }}
-                    >
-                        {saving ? "保存中..." : "保存する"}
+                        <div style={{ marginBottom: "20px" }}>
+                            アイコン
+
+                            <div style={{ display: "flex", gap: "5px", marginBottom: "10px", flexWrap: "wrap" }}>
+                                {Object.keys(ICON_CATEGORIES).map(cat => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => setActiveTab(cat)}
+                                        style={{
+                                            padding: "5px 10px", borderRadius: "15px", border: "none",
+                                            backgroundColor: activeTab === cat ? "var(--primary)" : "#eee",
+                                            color: activeTab === cat ? "white" : "#555",
+                                            fontWeight: "bold", cursor: "pointer", fontSize: "0.9rem"
+                                        }}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                                {showPets && (
+                                    <button
+                                        onClick={() => setActiveTab("collection")}
+                                        style={{
+                                            padding: "5px 10px", borderRadius: "15px", border: "none",
+                                            backgroundColor: activeTab === "collection" ? "var(--primary)" : "#eee",
+                                            color: activeTab === "collection" ? "white" : "#555",
+                                            fontWeight: "bold", cursor: "pointer", fontSize: "0.9rem"
+                                        }}
+                                    >
+                                        コレクション
+                                    </button>
+                                )}
+                            </div>
+
+                            <div style={{
+                                display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px",
+                                maxHeight: "200px", overflowY: "auto", padding: "5px"
+                            }}>
+                                {activeTab === "collection" ? (
+                                    unlockedPetImages.length > 0 ? (
+                                        unlockedPetImages.map((imageId) => {
+                                            // imageId format: pet01_0 -> /pet/pet01/pet_01_lv0.png
+                                            // Need to reconstruct path.
+                                            // pet01_0 -> split -> id=pet01, stage=0
+                                            const parts = imageId.split("_");
+                                            const pId = parts[0];
+                                            const stage = parts[1];
+                                            const url = `/pet/${pId}/${pId.replace("pet", "pet_")}_lv${stage}.png`;
+
+                                            return (
+                                                <img
+                                                    key={imageId}
+                                                    src={url}
+                                                    onClick={() => setPhotoURL(url)}
+                                                    style={{
+                                                        width: "100%", aspectRatio: "1/1", cursor: "pointer",
+                                                        border: photoURL === url ? "4px solid var(--primary)" : "2px solid transparent",
+                                                        borderRadius: "10px", padding: "2px", objectFit: "contain",
+                                                        backgroundColor: "#f9f9f9"
+                                                    }}
+                                                />
+                                            );
+                                        })
+                                    ) : (
+                                        <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "20px", color: "#888" }}>
+                                            まだコレクションがありません。<br />ペットをそだててみよう！
+                                        </div>
+                                    )
+                                ) : (
+                                    ICON_CATEGORIES[activeTab].map((emoji) => {
+                                        const url = getEmojiUrl(emoji);
+                                        return (
+                                            <img
+                                                key={emoji}
+                                                src={url}
+                                                onClick={() => setPhotoURL(url)}
+                                                style={{
+                                                    width: "100%", aspectRatio: "1/1", cursor: "pointer",
+                                                    border: photoURL === url ? "4px solid var(--primary)" : "2px solid transparent",
+                                                    borderRadius: "10px", padding: "2px"
+                                                }}
+                                            />
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: "30px" }}>
+                            いろ
+                            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+                                {THEME_COLORS.map(c => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => setThemeColor(c.id)}
+                                        style={{
+                                            width: "40px", height: "40px", borderRadius: "50%",
+                                            backgroundColor: c.value,
+                                            border: themeColor === c.id ? "4px solid #333" : "none",
+                                            cursor: "pointer", transform: themeColor === c.id ? "scale(1.1)" : "scale(1)"
+                                        }}
+                                        title={c.name}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+
+
+
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                    <button id="tutorial-settings-close-btn" onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: "10px", border: "none", backgroundColor: "#ccc", fontWeight: "bold", cursor: "pointer" }}>やめる</button>
+                    <button id="tutorial-settings-save-btn" onClick={handleSave} disabled={saving} style={{ flex: 2, padding: "10px", borderRadius: "10px", border: "none", backgroundColor: "var(--primary)", color: "white", fontWeight: "bold", cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+                        {saving ? "ほぞんしてるよ..." : "OK"}
                     </button>
                 </div>
             </div>

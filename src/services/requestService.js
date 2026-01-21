@@ -2,10 +2,10 @@ import { db } from "../lib/firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
 
 // Add a new request
-export const addRequest = async (uid, userName, email, title, content) => {
+export const addRequest = async (userId, userName, email, title, content) => {
     try {
         await addDoc(collection(db, "requests"), {
-            uid,
+            userId,
             userName,
             email,
             title,

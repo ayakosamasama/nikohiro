@@ -7,7 +7,8 @@ import Timeline from "../components/Timeline";
 import GroupList from "../components/GroupList";
 import TutorialModal from "../components/TutorialModal"; // Added import
 import { subscribeToGroups, subscribeToUserGroups } from "../services/groupService";
-import { updateUserProfile } from "../services/userService";
+import { updateUserProfile, getUserProfile } from "../services/userService";
+import PetScreen from "../components/PetScreen";
 
 export default function Home() {
   const { user, login, signup } = useAuth();
@@ -21,15 +22,24 @@ export default function Home() {
   const [allGroups, setAllGroups] = useState([]); // For tab labels
   const [filterMode, setFilterMode] = useState("all"); // 'all', 'friends', 'group'
   const [selectedGroupId, setSelectedGroupId] = useState(null);
-  const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups'
+  const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups', 'pet'
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [showPets, setShowPets] = useState(true);
 
   // Fetch joined groups for authenticated user
   useEffect(() => {
     if (user) {
       const unsubUser = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
       const unsubGroups = subscribeToGroups((groups) => setAllGroups(groups));
+
+      // Check Parent Settings for Pet Visibility
+      getUserProfile(user.uid).then(profile => {
+        if (profile?.settings?.showPets !== undefined) {
+          setShowPets(profile.settings.showPets);
+        }
+      });
+
       return () => {
         unsubUser();
         unsubGroups();
@@ -58,8 +68,9 @@ export default function Home() {
       if (err.code === "auth/weak-password") msg = "パスワードは6文字以上にしてください";
       else if (err.code === "auth/email-already-in-use") msg = "そのメールアドレスはすでに登録されています";
       else if (err.code === "auth/invalid-email") msg = "メールアドレスの形式が正しくありません";
-      else if (err.code === "auth/user-not-found") msg = "ユーザーが見つかりません";
-      else if (err.code === "auth/wrong-password") msg = "パスワードが違います";
+      else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        msg = "メールアドレス または パスワードが ちがいます";
+      }
       else if (err.code === "auth/too-many-requests") msg = "回数が多すぎます。しばらく待ってから試してください";
 
       setError(msg);
@@ -111,10 +122,28 @@ export default function Home() {
           >
             🔍 さがす
           </button>
+
+          {showPets && (
+            <button
+              id="tutorial-pet-tab"
+              onClick={() => setActiveTab("pet")}
+              style={{
+                flex: 1, padding: "10px", borderRadius: "25px", border: "none", fontWeight: "bold",
+                background: activeTab === "pet" ? "var(--primary)" : "transparent",
+                color: activeTab === "pet" ? "white" : "var(--color-grey)", cursor: "pointer"
+              }}
+            >
+              🐶 ペット
+            </button>
+          )}
         </div>
 
         {activeTab === "groups" ? (
           <GroupList />
+        ) : activeTab === "pet" ? (
+          <div style={{ height: "calc(100vh - 200px)", background: "white", borderRadius: "20px", boxShadow: "var(--shadow-sm)" }}>
+            <PetScreen />
+          </div>
         ) : (
           <>
             {/* Timeline Filter and List */}
@@ -207,6 +236,7 @@ export default function Home() {
                 userGroups={joinedGroupIds}
                 onClose={() => setIsPostModalOpen(false)}
                 onSuccess={() => setIsPostModalOpen(false)}
+                isTutorialMode={isTutorialOpen}
               />
             </div>
           </div>

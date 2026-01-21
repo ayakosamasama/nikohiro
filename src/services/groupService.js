@@ -24,13 +24,36 @@ export const initGroups = async () => {
     }
 };
 
-export const subscribeToGroups = (callback) => {
-    // Ensure init runs once (simplified)
-    initGroups();
+export const subscribeToGroups = (affiliationId = "default", callback) => {
+    // Backward compatibility: if first arg is function, treat as callback
+    if (typeof affiliationId === "function") {
+        callback = affiliationId;
+        affiliationId = "default";
+    }
+
+    // Ensure init runs once (simplified) - suppress error if non-admin
+    initGroups().catch(err => console.warn("Init groups skipped:", err.code));
+
+    // Note: To support "missing affiliationId = default", we need client-side filtering 
+    // or a comprehensive backfill. For a small app, client-side filtering is acceptable.
+    // However, to ensure security/privacy scale, we should eventually use server-side 'where'.
+
+    // Strategy: Fetch ALL groups, then filter. 
+    // Optimization: If affiliationId is specific (not default), we COULD use 'where', 
+    // but then we can't see "Global" groups if we wanted to sharing them (though requirement says strict isolation).
 
     return onSnapshot(collection(db, GROUPS_COLLECTION), (snapshot) => {
         const groups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        callback(groups);
+
+        const filtered = groups.filter(g => {
+            const gAff = g.affiliationId || "default";
+            const uAff = affiliationId || "default";
+            return gAff === uAff;
+        });
+
+        callback(filtered);
+    }, (error) => {
+        console.error("Groups snapshot error:", error);
     });
 };
 
@@ -73,11 +96,12 @@ export const toggleGroupMembership = async (userId, groupId, isJoining) => {
     }
 };
 // Admin: Create Group
-export const createGroup = async (id, name, emoji, color) => {
+export const createGroup = async (id, name, emoji, color, affiliationId = "default") => {
     await setDoc(doc(db, GROUPS_COLLECTION, id), {
         name,
         emoji,
-        color
+        color,
+        affiliationId
     });
 };
 
@@ -116,4 +140,17 @@ export const getGroupMembers = async (groupId) => {
 
     const results = await Promise.all(memberPromises);
     return results.filter(member => member !== null);
+};
+
+// Create default groups for a new affiliation
+export const createAffiliationGroups = async (affiliationId) => {
+    for (const group of DEFAULT_GROUPS) {
+        // Unique Group ID: affiliationId_groupId (e.g., "schoolA_game")
+        const newGroupId = `${affiliationId}_${group.id}`;
+        const groupRef = doc(db, GROUPS_COLLECTION, newGroupId);
+        await setDoc(groupRef, {
+            ...group,
+            affiliationId // Link to parent affiliation
+        });
+    }
 };

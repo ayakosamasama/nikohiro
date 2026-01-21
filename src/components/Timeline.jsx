@@ -1,13 +1,28 @@
 "use client";
 import { useEffect, useState } from "react";
-import { subscribeToPosts } from "../services/postService";
+import { subscribeToPosts, toggleReaction } from "../services/postService";
+import { useAuth } from "../context/AuthContext";
+import UserProfileModal from "./UserProfileModal";
+
+const STAMPS = [
+    { id: "like", emoji: "👍", label: "いい音！" }, // Typo intentional? "Inne!" Good sound? Probably "Good job" いいね
+    { id: "love", emoji: "❤️", label: "だいすき" },
+    { id: "awesome", emoji: "🎉", label: "すごい" },
+    { id: "surprised", emoji: "😲", label: "びっくり" },
+    { id: "sad", emoji: "😢", label: "かなしい" },
+    { id: "yay", emoji: "🙌", label: "わーい" },
+];
 
 export default function Timeline({ filterMode = "all", userGroups = [], selectedGroupId = null }) {
+    const { user } = useAuth();
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedUserId, setSelectedUserId] = useState(null);
 
     useEffect(() => {
-        const unsubscribe = subscribeToPosts((newPosts) => {
+        if (!user) return;
+
+        const unsubscribe = subscribeToPosts(user.affiliationId || "default", (newPosts) => {
             const filtered = newPosts.filter(post => {
                 if (filterMode === "all") return true;
                 if (filterMode === "friends") {
@@ -23,7 +38,7 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
             setLoading(false);
         });
         return () => unsubscribe();
-    }, [filterMode, userGroups, selectedGroupId]);
+    }, [filterMode, userGroups, selectedGroupId, user]);
 
     if (loading) return <p style={{ textAlign: "center", padding: "20px" }}>よみこみ中...</p>;
 
@@ -40,12 +55,19 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
                     gap: "15px",
                     alignItems: "flex-start"
                 }}>
-                    <div style={{
-                        width: "50px", height: "50px", borderRadius: "50%",
-                        backgroundColor: "#eee", overflow: "hidden", flexShrink: 0,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "2rem"
-                    }}>
+
+                    <div
+                        onClick={() => setSelectedUserId(post.userId)}
+                        style={{
+                            width: "50px", height: "50px", borderRadius: "50%",
+                            backgroundColor: "#eee", overflow: "hidden", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "2rem", cursor: "pointer", border: "2px solid white",
+                            boxShadow: "0 2px 5px rgba(0,0,0,0.1)", transition: "transform 0.1s"
+                        }}
+                        onMouseDown={e => e.currentTarget.style.transform = "scale(0.9)"}
+                        onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
                         {post.userIcon ? (
                             <img src={post.userIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
@@ -65,9 +87,51 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
                             <span style={{ color: "var(--color-grey)", fontSize: "0.9rem" }}>{post.mood?.label}</span>
                         </div>
                         <p style={{ lineHeight: "1.5", fontSize: "1rem", whiteSpace: "pre-wrap" }}>{post.text}</p>
+
+                        {/* Stamps Section */}
+                        <div style={{ marginTop: "15px", display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                            {STAMPS.map(stamp => {
+                                const reactions = post.reactions || {};
+                                const userIds = reactions[stamp.id] || [];
+                                const count = userIds.length;
+                                const isReacted = user && userIds.includes(user.uid);
+
+                                return (
+                                    <button
+                                        key={stamp.id}
+                                        onClick={() => user && toggleReaction(post.id, user.uid, stamp.id)}
+                                        style={{
+                                            background: isReacted ? "#fff0f5" : "#f8f9fa",
+                                            border: isReacted ? "2px solid #fd79a8" : "1px solid #ddd",
+                                            borderRadius: "20px",
+                                            padding: "5px 12px",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "5px",
+                                            transition: "all 0.1s"
+                                        }}
+                                    >
+                                        <span style={{ fontSize: "1.2rem" }}>{stamp.emoji}</span>
+                                        {count > 0 && (
+                                            <span style={{ fontSize: "0.9rem", color: isReacted ? "#e84393" : "#636e72", fontWeight: "bold" }}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             ))}
+
+            {selectedUserId && (
+                <UserProfileModal
+                    userId={selectedUserId}
+                    onClose={() => setSelectedUserId(null)}
+                />
+            )}
         </div>
     );
 }

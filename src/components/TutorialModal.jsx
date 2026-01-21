@@ -3,78 +3,118 @@ import { useState, useEffect, useRef } from "react";
 
 const TUTORIAL_STEPS = [
     {
-        title: "ニコニコひろばへようこそ！",
-        content: "アカウントの作成ありがとうございます。\nまずはアプリの使い方を一緒にやってみましょう。",
-        emoji: "🎉",
+        title: "ようこそ！(保護者の方へ)",
+        content: "ニコニコひろばへようこそ。\nまずはじめに、お子様が安全に利用できるように設定を行いましょう。",
+        emoji: "👋",
         targetId: null
     },
     {
-        title: "1. ユーザー設定",
-        content: "まずは自分だけのアイコンや色を決めましょう。\n右上の「⚙️（歯車）」ボタンを押してみてください。",
+        title: "1. 保護者設定を開く",
+        content: "画面上の「おうちのひとへ」ボタンを押してください。\nここから管理画面へアクセスできます。",
+        emoji: "👨‍👩‍👧‍👦",
+        targetId: "tutorial-parent-btn",
+        action: "click",
+        position: "bottom"
+    },
+    {
+        title: "2. パスワード入力",
+        content: "初期パスワード「2525」を入力して、「OK」を押してください。",
+        emoji: "🔐",
+        targetId: "tutorial-parent-login-btn",
+        action: "click",
+        position: "bottom"
+    },
+    {
+        title: "3. 各種設定について",
+        content: "ここではクイズの難易度や、利用時間、パスワードの変更などができます。\nお子様の成長に合わせて調整してください。",
         emoji: "⚙️",
+        targetId: "tutorial-tab-quiz",
+        action: "next"
+    },
+    {
+        title: "4. 所属の設定",
+        content: "次に、「所属」タブを押してください。\nここでお子様の通っているスクールや園を選択します。",
+        emoji: "🏫",
+        targetId: "tutorial-tab-affiliation",
+        action: "click"
+    },
+    {
+        title: "5. 保存する",
+        content: "所属を選んだら、一番下の「設定を保存する」ボタンを押してください。",
+        emoji: "💾",
+        targetId: "tutorial-save-affiliation-btn",
+        action: "click",
+        position: "viewport-top"
+    },
+    {
+        title: "バトンタッチ！",
+        content: "これで保護者設定は完了です。\nここからは、お子様と一緒に操作してみてください！",
+        emoji: "🤝",
+        targetId: null
+    },
+    {
+        title: "6. プロフィール設定",
+        content: "まずは、じぶんだけの アイコンや いろを きめよう！\n「⚙️（歯車）」ボタンを おしてみてね。",
+        emoji: "🎨",
         targetId: "tutorial-settings-btn",
+        action: "click",
+        position: "bottom"
+    },
+    {
+        title: "7. アイコンをえらぶ",
+        content: "すきな アイコンを えらんで、「OK」ボタンを おしてね。",
+        emoji: "🖼️",
+        targetId: "tutorial-settings-save-btn",
         action: "click"
     },
     {
-        title: "設定を閉じる",
-        content: "設定が終わったら、「キャンセル」または「保存」ボタンで画面を閉じてください。\n（チュートリアルを進めるには「キャンセル」を押してください）",
-        emoji: "✖️",
-        targetId: "tutorial-settings-close-btn",
-        action: "click"
-    },
-    {
-        title: "2. グループ参加",
-        content: "次はグループを探してみましょう。\n「🔍 さがす」ボタンを押して、興味のあるグループを見つけてください。",
-        emoji: "👥",
+        title: "8. グループをさがそう",
+        content: "「さがす」ボタンを おして、みんなが いる グループに はいってみよう！",
+        emoji: "🔍",
         targetId: "tutorial-groups-tab",
         action: "click"
     },
     {
-        title: "ひろばに戻る",
-        content: "いろいろなグループが見つかりましたか？\n次は投稿をするために、「🏠 ひろば」ボタンを押して戻りましょう。",
+        title: "9. ひろばに もどろう",
+        content: "「ひろば」ボタンを おして、みんなの いる ばしょに もどろう！",
         emoji: "🏠",
         targetId: "tutorial-home-tab",
         action: "click"
     },
     {
-        title: "3. きもちを投稿する",
-        content: "ひろばに戻ったら、右下の「✏️（えんぴつ）」ボタンを押して、今のきもちを書いてみましょう。",
+        title: "10. きもちを かいてみよう",
+        content: "「えんぴつ」ボタンで、いまの きもちを とうこう してみよう。\nスタンプも おせるよ！",
         emoji: "✏️",
         targetId: "tutorial-post-fab",
         action: "click"
     },
     {
-        title: "きもちをえらぶ",
-        content: "ここで絵文字を選んだり、メッセージを書いたりできます。\n（※実際には投稿せずに次へ進みます）",
-        emoji: "📝",
+        title: "11. きもちを えらぼう",
+        content: "まずは、いまの きぶんを えらんでね。\nそのあと、メッセージを かけるよ！",
+        emoji: "🤔",
         targetId: "tutorial-mood-area",
+        action: "next",
+        position: "bottom"
+    },
+    {
+        title: "12. とうこうする",
+        content: "きもちを かいたら、「とうこうする」ボタンを おしてね。",
+        emoji: "✉️",
+        targetId: "tutorial-post-submit",
+        action: "click",
+        position: "top"
+    },
+    {
+        title: "13. ペットと あそぼう",
+        content: "とうこうすると、ペットが よろこぶよ！\n「ペット」タブを おして、ようすを みてみてね。",
+        emoji: "🐶",
+        targetId: "tutorial-pet-tab",
         action: "next"
     },
     {
-        title: "とじてみる",
-        content: "一度、右上の「×」ボタンを押して画面を閉じてみましょう。",
-        emoji: "✖️",
-        targetId: "tutorial-post-close-btn",
-        action: "click"
-    },
-    {
-        title: "4. 保護者用管理機能",
-        content: "保護者の方は、こちらの「おうちのひとへ」ボタンから管理画面へ入れます。\n活動の見守りやお問い合わせはここからです。",
-        emoji: "🛡️",
-        targetId: "tutorial-parent-btn",
-        action: "click"
-    },
-    {
-        title: "設定を閉じる",
-        content: "保護者用設定へはパスワードがないと入れません。\n今は「キャンセル」を押して戻りましょう。",
-        emoji: "🔙",
-        targetId: "tutorial-parent-cancel-btn",
-        action: "click"
-    },
-    {
-        title: "準備完了！",
-        content: "これでチュートリアルは終わりです。\nさあ、ニコニコひろばを楽しんでください！",
-        emoji: "🌈",
+        title: "じゅんび かんりょう！",
+        content: "これで ぜんぶ おわり！\nニコニコひろばを たのしんでね！",
+        emoji: "🎉",
         targetId: null
     }
 ];
@@ -97,13 +137,25 @@ export default function TutorialModal({ isOpen, onClose }) {
             if (currentStep?.targetId) {
                 const el = document.getElementById(currentStep.targetId);
                 if (el) {
+                    // Only scroll if we haven't computed rect for this step yet to avoid jitter
+                    // OR strict logic: check visibility? 
+                    // Simple check: if step changed.
+                    // But we don't have previous step ref here easily in this effect.
+                    // Let's just do it. But updateRect runs every 100ms. Jitter risk.
+                    // Better to put scroll logic in the step-change effect.
                     const r = el.getBoundingClientRect();
-                    setRect({
-                        top: r.top - 5,
-                        left: r.left - 5,
-                        width: r.width + 10,
-                        height: r.height + 10
-                    });
+                    // Ensure rect is valid (visible)
+                    if (r.width > 0 || r.height > 0) {
+                        setRect({
+                            top: r.top - 5,
+                            left: r.left - 5,
+                            width: r.width + 10,
+                            height: r.height + 10,
+                            bottom: r.bottom + 5 // Store real bottom for calculation
+                        });
+                    } else {
+                        setRect(null);
+                    }
                 } else {
                     setRect(null);
                 }
@@ -116,7 +168,7 @@ export default function TutorialModal({ isOpen, onClose }) {
             updateRect();
             window.addEventListener("resize", updateRect);
             // Polling for element appearance (in case of dynamic rendering)
-            const interval = setInterval(updateRect, 500);
+            const interval = setInterval(updateRect, 100);
             return () => {
                 window.removeEventListener("resize", updateRect);
                 clearInterval(interval);
@@ -127,6 +179,12 @@ export default function TutorialModal({ isOpen, onClose }) {
     // Handle clicks on the target element
     useEffect(() => {
         const currentStep = TUTORIAL_STEPS[step];
+        if (isOpen && currentStep?.targetId) {
+            // Scroll attempt
+            const el = document.getElementById(currentStep.targetId);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
         if (isOpen && currentStep?.action === "click" && currentStep.targetId) {
             const el = document.getElementById(currentStep.targetId);
             if (el) {
@@ -173,12 +231,6 @@ export default function TutorialModal({ isOpen, onClose }) {
             zIndex: 2000, pointerEvents: "none" // Let clicks pass through generally
         }}>
             {/* Backdrop / Dimmer */}
-            {/* Implementation Check: pointer-events auto only on Next button or Modal box? 
-                If we want user to click the Target, we shouldn't cover it.
-                We can dim everything ELSE. Complex with CSS clip-path or multiple divs.
-                Simpler: Just a modal box that doesn't block clicks, and a Highlight Box.
-            */}
-
             {/* Highlight Box */}
             {rect && (
                 <div style={{
@@ -199,7 +251,8 @@ export default function TutorialModal({ isOpen, onClose }) {
                         background: "#ff4757", color: "white", padding: "6px 12px", borderRadius: "20px",
                         fontWeight: "bold", fontSize: "0.9rem", whiteSpace: "nowrap",
                         animation: "bounce 1s infinite",
-                        boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
+                        boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+                        pointerEvents: "none"
                     }}>
                         {rect.top < 100 ? "👆 ここを押してね！" : "👇 ここを押してね！"}
                     </div>
@@ -218,11 +271,22 @@ export default function TutorialModal({ isOpen, onClose }) {
             {/* Modal Content */}
             <div style={{
                 position: "fixed",
-                // If rect exists: position relative to it (pixels). If not: center of screen.
-                top: rect ? (rect.top > window.innerHeight / 2 ? "auto" : `${rect.bottom + 20}px`) : "50%",
-                bottom: rect ? (rect.top > window.innerHeight / 2 ? `${window.innerHeight - rect.top + 20}px` : "auto") : "auto",
+                // Dynamic Logic: Place strictly Above or Below the target rect
+                ...(rect ? (
+                    // 1. Explicit priority: if position is set, use it.
+                    (currentStep.position === "viewport-top") ? { top: "80px", bottom: "auto" } :
+                        (currentStep.position === "bottom") ? { top: `${rect.bottom + 20}px`, bottom: "auto" } :
+                            (currentStep.position === "top") ? { top: "auto", bottom: `${window.innerHeight - rect.top + 20}px` } :
+                                // 2. Auto calculated: if target is in bottom half, show on top.
+                                (rect.top > window.innerHeight / 2) ? { top: "auto", bottom: `${window.innerHeight - rect.top + 20}px` }
+                                    // 3. Default: show below
+                                    : { top: `${rect.bottom + 20}px`, bottom: "auto" }
+                ) : (
+                    (currentStep.position === "top") ? { top: "50px", bottom: "auto" } :
+                        { top: "auto", bottom: "50px" }
+                )), // Default to bottom if no rect
                 left: "50%",
-                transform: "translateX(-50%)" + (rect ? "" : " translateY(-50%)"),
+                transform: "translateX(-50%)",
                 background: "#ffffff",
                 color: "#333333",
                 padding: "25px",

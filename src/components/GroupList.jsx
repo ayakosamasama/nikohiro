@@ -10,12 +10,10 @@ export default function GroupList() {
     const [initializing, setInitializing] = useState(false);
 
     useEffect(() => {
-        const unsubGroups = subscribeToGroups((data) => setGroups(data));
-        let unsubUserGroups = () => { };
+        if (!user) return;
 
-        if (user) {
-            unsubUserGroups = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
-        }
+        const unsubGroups = subscribeToGroups(user.affiliationId || "default", (data) => setGroups(data));
+        const unsubUserGroups = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
 
         return () => {
             unsubGroups();

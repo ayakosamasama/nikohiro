@@ -2,9 +2,20 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/navigation";
-import { getAllUsers, subscribeToNgWords, addNgWord, removeNgWord } from "../../services/adminService";
+import { db, auth } from "../../lib/firebase"; // Added auth
+import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import {
+    getAllUsers, updateUserRole, deleteUser,
+    getFlaggedPosts, deletePost, dismissFlag,
+    subscribeToNgWords, addNgWord, removeNgWord
+} from "../../services/adminService";
 import { getAllRequests, deleteRequest } from "../../services/requestService";
+import { updateUserProfile } from "../../services/userService";
+import {
+    getAffiliations, createAffiliation, updateAffiliation, deleteAffiliation, subscribeToAffiliations
+} from "../../services/affiliationService";
 import { createGroup, updateGroup, deleteGroup, getGroupMembers, subscribeToGroups } from "../../services/groupService";
+import { grantPostRewards } from "../../services/gameService";
 
 // --- Helper Components ---
 const SectionCard = ({ title, count, children, action }) => (
@@ -79,11 +90,14 @@ const TabButton = ({ id, label, count, activeTab, onClick }) => (
 );
 
 export default function AdminPage() {
-    const { user, loading } = useAuth();
+    const { user, isAdmin, loading } = useAuth();
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState("users");
     const [users, setUsers] = useState([]);
+    const [affiliations, setAffiliations] = useState([]); // New State
     const [requests, setRequests] = useState([]);
     const [groups, setGroups] = useState([]);
+    const [selectedGroupAffiliation, setSelectedGroupAffiliation] = useState("default"); // New State for Group Filter
     const [loadingData, setLoadingData] = useState(true);
 
     // Group Modal State
@@ -99,20 +113,70 @@ export default function AdminPage() {
     const [ngWords, setNgWords] = useState([]);
     const [newNgWord, setNewNgWord] = useState("");
 
-    const [activeTab, setActiveTab] = useState("users");
+
+    const fetchUsers = async () => {
+        const usersData = await getAllUsers();
+        setUsers(usersData);
+    };
+
+    const fetchRequests = async () => {
+        const requestsData = await getAllRequests();
+        setRequests(requestsData);
+    };
+
+    const fetchFlags = async () => {
+        // Assuming getFlaggedPosts exists and returns data for flags
+        // const flagsData = await getFlaggedPosts();
+        // setFlags(flagsData);
+    };
+
+    const fetchAffiliationsData = async () => {
+        const data = await getAffiliations();
+        setAffiliations(data);
+    };
 
     useEffect(() => {
-        if (!loading && user?.isAdmin) {
+        if (!loading && isAdmin) {
             // Realtime subscriptions
-            const unsubGroups = subscribeToGroups(setGroups);
+            // Realtime subscriptions
+            // Groups subscription moved to separate useEffect
             const unsubNg = subscribeToNgWords(setNgWords);
-            fetchData();
-            return () => {
-                unsubGroups();
-                unsubNg();
+            const unsubAffiliations = subscribeToAffiliations(setAffiliations); // Subscribe to affiliations
+
+            const initialFetch = async () => {
+                setLoadingData(true);
+                try {
+                    await Promise.all([
+                        fetchUsers().catch(e => console.error("fetchUsers failed", e)),
+                        fetchRequests().catch(e => console.error("fetchRequests failed", e)),
+                        fetchFlags().catch(e => console.error("fetchFlags failed", e)),
+                        fetchAffiliationsData().catch(e => console.error("fetchAffiliationsData failed", e))
+                    ]);
+                } catch (e) {
+                    console.error("Promise.all failed", e);
+                } finally {
+                    setLoadingData(false);
+                }
             };
+            initialFetch();
+
+            return () => {
+                // unsubGroups handled separately
+                unsubNg();
+                unsubAffiliations();
+            };
+        } else if (!loading && !isAdmin) {
+            router.push("/"); // Redirect if not admin
         }
     }, [user, loading, router]);
+
+    // Separate effect for Groups subscription to handle filter changes
+    useEffect(() => {
+        if (!loading && isAdmin) {
+            const unsubGroups = subscribeToGroups(selectedGroupAffiliation, setGroups);
+            return () => unsubGroups();
+        }
+    }, [user, loading, selectedGroupAffiliation]);
 
     // ... existing handlers
 
@@ -137,6 +201,14 @@ export default function AdminPage() {
         }
     };
 
+    const handleTestEgg = async () => {
+        if (!user) return;
+        // userId, forceEgg=true, xpMultiplier=100
+        const result = await grantPostRewards(user.uid, true, 100);
+        console.log("Test Egg Result:", result);
+        alert(`テスト実行: ${result.eggFound ? "タマゴ発見！" : "はずれ"} XP+${result.petXPGained}`);
+    };
+
     // ... existing render
 
 
@@ -144,18 +216,18 @@ export default function AdminPage() {
     {/* Modals ... */ }
 
     const fetchData = async () => {
+        // This function is now largely replaced by the useEffect's initialFetch
+        // Keeping it for now, but it might become redundant or need refactoring
         try {
-            const [usersData, requestsData] = await Promise.all([
-                getAllUsers(),
-                getAllRequests()
+            await Promise.all([
+                fetchUsers(),
+                fetchRequests()
             ]);
-            setUsers(usersData);
-            setRequests(requestsData);
         } catch (error) {
             console.error(error);
             alert("データの取得に失敗しました");
         } finally {
-            setLoadingData(false);
+            // setLoadingData(false); // Handled by useEffect's initialFetch
         }
     };
 
@@ -254,7 +326,7 @@ export default function AdminPage() {
                 await updateGroup(groupForm.id, groupForm);
                 alert("更新しました");
             } else {
-                await createGroup(groupForm.id, groupForm.name, groupForm.emoji, groupForm.color);
+                await createGroup(groupForm.id, groupForm.name, groupForm.emoji, groupForm.color, selectedGroupAffiliation);
                 alert("作成しました");
             }
             setIsGroupModalOpen(false);
@@ -287,9 +359,74 @@ export default function AdminPage() {
         }
     };
 
+    const handleCreateAffiliation = async () => {
+        const name = prompt("新しい所属名を入力してください (例: ○○幼稚園):");
+        if (name) {
+            try {
+                await createAffiliation(name);
+                alert("所属を追加しました");
+                // fetchAffiliationsData is called by the subscription
+            } catch (e) {
+                console.error(e);
+                alert("所属の追加に失敗しました");
+            }
+        }
+    };
+
+
+
+    const handleEditAffiliation = async (id, currentName) => {
+        const newName = prompt("新しい所属名を入力してください:", currentName);
+        if (newName && newName !== currentName) {
+            try {
+                await updateAffiliation(id, { name: newName });
+                alert("所属名を変更しました");
+                // fetchAffiliationsData is called by the subscription
+            } catch (e) {
+                console.error(e);
+                alert("所属名の変更に失敗しました");
+            }
+        }
+    };
+
+    const handleDeleteAffiliation = async (id) => {
+        if (id === "default") {
+            alert("「所属なし」は削除できません。");
+            return;
+        }
+        if (confirm("本当にこの所属を削除しますか？")) {
+            try {
+                await deleteAffiliation(id);
+                alert("所属を削除しました");
+                // fetchAffiliationsData is called by the subscription
+            } catch (e) {
+                console.error(e);
+                alert("所属の削除に失敗しました");
+            }
+        }
+    };
+
+    // Helper to get affiliation name
+    const getAffiliationName = (id) => {
+        if (!id || id === "default") return "所属なし";
+        const aff = affiliations.find(a => a.id === id);
+        return aff ? aff.name : "不明";
+    };
+
+    const handleUpdateUserAffiliation = async (userId, newAffiliationId) => {
+        try {
+            await updateUserProfile(userId, { affiliationId: newAffiliationId });
+            alert("ユーザーの所属を更新しました");
+            fetchUsers(); // Re-fetch users to show updated affiliation
+        } catch (e) {
+            console.error(e);
+            alert("ユーザーの所属更新に失敗しました");
+        }
+    };
 
 
     if (loading || loadingData) return <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>読み込み中...</div>;
+    if (!user?.isAdmin) return <div style={{ padding: "50px", textAlign: "center" }}>アクセス権限がありません</div>;
 
     // Components moved to top...
 
@@ -308,9 +445,26 @@ export default function AdminPage() {
             {/* Tab Navigation */}
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", background: "white", padding: "8px", borderRadius: "12px", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
                 <TabButton id="users" label="ユーザー" count={users.length} activeTab={activeTab} onClick={setActiveTab} />
+                <TabButton id="affiliations" label="所属管理" count={affiliations.length} activeTab={activeTab} onClick={setActiveTab} />
                 <TabButton id="groups" label="グループ" count={groups.length} activeTab={activeTab} onClick={setActiveTab} />
                 <TabButton id="requests" label="申請・お問い合わせ" count={requests.length} activeTab={activeTab} onClick={setActiveTab} />
                 <TabButton id="safety" label="NGワード" count={ngWords.length} activeTab={activeTab} onClick={setActiveTab} />
+            </div>
+
+            {/* Content Area */}
+            <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
+                <div style={{ marginBottom: "30px", padding: "15px", border: "2px dashed #ccc", borderRadius: "10px" }}>
+                    <h3>🛠️ システムテスト (管理者用)</h3>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={handleTestEgg} className="btn" style={{ background: "#9b59b6", color: "white" }}>
+                            強制タマゴ発見 & XP付与
+                        </button>
+                    </div>
+                    <p style={{ fontSize: "0.8rem", color: "#666", marginTop: "5px" }}>
+                        ※あなたのアカウントに対して実行されます。<br />
+                        ※タマゴ条件: ペットなし or Lv70以上 (強制モードなら無視して30%判定...ではなく強制Trueにします)
+                    </p>
+                </div>
             </div>
 
             {activeTab === "users" && (
@@ -323,6 +477,7 @@ export default function AdminPage() {
                                     <TableHeader>ニックネーム</TableHeader>
                                     <TableHeader>メールアドレス</TableHeader>
                                     <TableHeader>権限</TableHeader>
+                                    <TableHeader>所属</TableHeader>
                                     <TableHeader>操作</TableHeader>
                                 </tr>
                             </thead>
@@ -344,6 +499,17 @@ export default function AdminPage() {
                                                 {u.isAdmin ? "管理者" : "一般"}
                                             </span>
                                         </TableCell>
+                                        <TableCell>
+                                            <select
+                                                value={u.affiliationId || "default"}
+                                                onChange={(e) => handleUpdateUserAffiliation(u.id, e.target.value)}
+                                                style={{ padding: "5px", borderRadius: "5px", border: "1px solid #ccc" }}
+                                            >
+                                                {affiliations.map(aff => (
+                                                    <option key={aff.id} value={aff.id}>{aff.name}</option>
+                                                ))}
+                                            </select>
+                                        </TableCell>
                                         <td style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", gap: "8px" }}>
                                             <ActionButton onClick={() => handleEdit(u.id, u.email)} color="#f0ad4e" label="編集" />
                                             <ActionButton onClick={() => handleDelete(u.id)} color="#ff7675" label="削除" />
@@ -356,11 +522,72 @@ export default function AdminPage() {
                 </SectionCard>
             )}
 
+            {activeTab === "affiliations" && (
+                <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
+                        <h3>所属一覧</h3>
+                        <button onClick={handleCreateAffiliation} className="btn-primary" style={{ padding: "10px 20px", background: "var(--primary)", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "600", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }}>
+                            ＋ 所属を追加
+                        </button>
+                    </div>
+
+                    <div style={{ background: "white", padding: "20px", borderRadius: "10px", boxShadow: "0 2px 5px rgba(0,0,0,0.1)" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                                <tr style={{ borderBottom: "2px solid #eee", textAlign: "left" }}>
+                                    <th style={{ padding: "10px" }}>ID</th>
+                                    <th style={{ padding: "10px" }}>所属名</th>
+                                    <th style={{ padding: "10px" }}>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {affiliations.map(aff => (
+                                    <tr key={aff.id} style={{ borderBottom: "1px solid #eee" }}>
+                                        <td style={{ padding: "10px", fontFamily: "monospace", color: "#666" }}>{aff.id}</td>
+                                        <td style={{ padding: "10px", fontWeight: "bold" }}>{aff.name}</td>
+                                        <td style={{ padding: "10px" }}>
+                                            {aff.id !== "default" && (
+                                                <div style={{ display: "flex", gap: "10px" }}>
+                                                    <button
+                                                        onClick={() => handleEditAffiliation(aff.id, aff.name)}
+                                                        style={{ background: "#f0ad4e", color: "white", border: "none", padding: "5px 10px", borderRadius: "5px", cursor: "pointer" }}
+                                                    >
+                                                        編集
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteAffiliation(aff.id)}
+                                                        style={{ background: "#ff6b6b", color: "white", border: "none", padding: "5px 10px", borderRadius: "5px", cursor: "pointer" }}
+                                                    >
+                                                        削除
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {activeTab === "groups" && (
                 <SectionCard title="グループ管理" count={groups.length} action={
-                    <button onClick={() => handleOpenGroupModal()} style={{ background: "var(--primary)", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }}>
-                        + 新規グループ作成
-                    </button>
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <select
+                            value={selectedGroupAffiliation}
+                            onChange={(e) => setSelectedGroupAffiliation(e.target.value)}
+                            style={{ padding: "10px", borderRadius: "8px", border: "1px solid #ddd", background: "white", cursor: "pointer" }}
+                        >
+                            <option value="default">所属なし（共通）</option>
+                            {affiliations.filter(a => a.id !== "default").map(aff => (
+                                <option key={aff.id} value={aff.id}>{aff.name}</option>
+                            ))}
+                        </select>
+                        <button onClick={() => handleOpenGroupModal()} style={{ background: "var(--primary)", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }}>
+                            + 新規グループ作成
+                        </button>
+                    </div>
                 }>
                     <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0" }}>

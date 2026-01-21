@@ -2,12 +2,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getUserProfile, updateUserProfile } from "../services/userService";
+import { getAffiliations } from "../services/affiliationService"; // Import affiliation service
 import { addRequest } from "../services/requestService";
 import { updatePassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
 export default function ParentSettings({ isOpen, onClose }) {
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth(); // Destructure refreshProfile
 
     // Gatekeeper State
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -15,12 +16,12 @@ export default function ParentSettings({ isOpen, onClose }) {
     const [authError, setAuthError] = useState("");
 
     // Settings State
-    const [activeTab, setActiveTab] = useState("quiz"); // "quiz" or "password"
+    const [activeTab, setActiveTab] = useState("quiz"); // "quiz", "time", "password", "request", "affiliation"
     const [loading, setLoading] = useState(false);
 
     const [quizSettings, setQuizSettings] = useState({
-        maxAnswer: 20,
-        operations: ["add", "sub"],
+        maxAnswer: 2,
+        operations: ["add"],
         categories: ["arithmetic"] // default
     });
 
@@ -33,6 +34,14 @@ export default function ParentSettings({ isOpen, onClose }) {
     const [reqTitle, setReqTitle] = useState("");
     const [reqContent, setReqContent] = useState("");
 
+    // Time Limit State
+    const [usageLimit, setUsageLimit] = useState({ enabled: false, start: "21:00", end: "07:00" });
+    const [showPets, setShowPets] = useState(true);
+
+    // Affiliation State
+    const [affiliations, setAffiliations] = useState([]); // Affiliations list
+    const [selectedAffiliation, setSelectedAffiliation] = useState(""); // User's current affiliation
+
     useEffect(() => {
         if (isOpen && user) {
             // Reset state on open
@@ -40,6 +49,8 @@ export default function ParentSettings({ isOpen, onClose }) {
             setInputPin("");
             setAuthError("");
             loadSettings();
+            // Fetch affiliations when component opens
+            getAffiliations().then(data => setAffiliations(data)).catch(console.error);
         }
     }, [isOpen, user]);
 
@@ -58,6 +69,18 @@ export default function ParentSettings({ isOpen, onClose }) {
                 } else {
                     setCurrentParentPin("2525"); // Default
                 }
+                // Load Time Limit
+                if (profile.usageLimit) {
+                    setUsageLimit(profile.usageLimit);
+                } else {
+                    setUsageLimit({ enabled: false, start: "21:00", end: "06:00" });
+                }
+                // Load Show Pets
+                if (profile.settings && profile.settings.showPets !== undefined) {
+                    setShowPets(profile.settings.showPets);
+                }
+                // Load Affiliation
+                setSelectedAffiliation(profile.affiliationId || "");
             }
         } catch (error) {
             console.error("Failed to load settings", error);
@@ -73,14 +96,18 @@ export default function ParentSettings({ isOpen, onClose }) {
         }
     };
 
-    const handleSaveQuiz = async () => {
+    const handleSaveSettings = async () => {
         if (!user) return;
         setLoading(true);
         try {
             await updateUserProfile(user.uid, {
-                quizSettings
+                quizSettings,
+                usageLimit,
+                "settings.showPets": showPets,
+                affiliationId: selectedAffiliation // Save selected affiliation
             });
             alert("設定を保存しました！");
+            await refreshProfile(); // Refresh context without reload
             onClose();
         } catch (error) {
             alert("保存に失敗しました");
@@ -180,7 +207,7 @@ export default function ParentSettings({ isOpen, onClose }) {
         }}>
             <div style={{
                 backgroundColor: "white", padding: "30px", borderRadius: "20px",
-                width: "90%", maxWidth: "500px",
+                width: "95%", maxWidth: "600px",
                 maxHeight: "90vh", overflowY: "auto",
                 border: "4px solid #666",
                 color: "#333" // Reset text color to dark
@@ -194,6 +221,7 @@ export default function ParentSettings({ isOpen, onClose }) {
                     <div style={{ textAlign: "center" }}>
                         <p style={{ marginBottom: "15px" }}>パスワードを入力してください（初期: 2525）</p>
                         <input
+                            id="tutorial-parent-pin-input"
                             type="password"
                             value={inputPin}
                             onChange={(e) => setInputPin(e.target.value)}
@@ -206,43 +234,48 @@ export default function ParentSettings({ isOpen, onClose }) {
                         {authError && <p style={{ color: "red", marginBottom: "15px" }}>{authError}</p>}
                         <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
                             <button id="tutorial-parent-cancel-btn" onClick={onClose} style={{ padding: "10px 20px", borderRadius: "10px", border: "none" }}>キャンセル</button>
-                            <button onClick={handleLogin} className="btn btn-primary" style={{ padding: "10px 30px" }}>OK</button>
+                            <button id="tutorial-parent-login-btn" onClick={handleLogin} className="btn btn-primary" style={{ padding: "10px 30px" }}>OK</button>
                         </div>
                     </div>
                 ) : (
                     // Settings Content
                     <div>
-                        <div style={{ display: "flex", borderBottom: "2px solid #ddd", marginBottom: "20px" }}>
-                            <button
-                                onClick={() => setActiveTab("quiz")}
-                                style={{
-                                    flex: 1, padding: "10px",
-                                    background: activeTab === "quiz" ? "#eee" : "transparent",
-                                    border: "none", fontWeight: "bold", borderBottom: activeTab === "quiz" ? "3px solid var(--primary)" : "none"
-                                }}
-                            >
-                                計算クイズ設定
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("password")}
-                                style={{
-                                    flex: 1, padding: "10px",
-                                    background: activeTab === "password" ? "#eee" : "transparent",
-                                    border: "none", fontWeight: "bold", borderBottom: activeTab === "password" ? "3px solid var(--primary)" : "none"
-                                }}
-                            >
-                                パスワード管理
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("request")}
-                                style={{
-                                    flex: 1, padding: "10px",
-                                    background: activeTab === "request" ? "#eee" : "transparent",
-                                    border: "none", fontWeight: "bold", borderBottom: activeTab === "request" ? "3px solid var(--primary)" : "none"
-                                }}
-                            >
-                                申請・要望
-                            </button>
+                        <div style={{
+                            display: "flex",
+                            width: "100%",
+                            borderBottom: "1px solid #ddd",
+                            marginBottom: "20px",
+                            overflowX: "auto",
+                            overflowY: "hidden",
+                            WebkitOverflowScrolling: "touch",
+                            boxSizing: "border-box",
+                            paddingBottom: "5px" // Room for scrollbar
+                        }}>
+                            {[
+                                { id: "quiz", label: "クイズ", tid: "tutorial-tab-quiz" },
+                                { id: "time", label: "利用時間", tid: "tutorial-tab-time" },
+                                { id: "password", label: "パスワード", tid: "tutorial-tab-password" },
+                                { id: "request", label: "申請・要望", tid: "tutorial-tab-request" },
+                                { id: "affiliation", label: "所属", tid: "tutorial-tab-affiliation" },
+                                { id: "release", label: "更新" }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    id={tab.tid}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    style={{
+                                        padding: "10px 15px", whiteSpace: "nowrap", flexShrink: 0,
+                                        minWidth: "fit-content", boxSizing: "border-box",
+                                        background: activeTab === tab.id ? "#eee" : "transparent",
+                                        border: "none", fontWeight: "bold",
+                                        borderBottom: activeTab === tab.id ? "3px solid var(--primary)" : "none"
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                            {/* Large spacer to ensure the last tab isn't cut off during scrolling */}
+                            <div style={{ flexShrink: 0, width: "100px" }}></div>
                         </div>
 
                         {activeTab === "quiz" && (
@@ -301,7 +334,81 @@ export default function ParentSettings({ isOpen, onClose }) {
                                     </div>
                                 </section>
 
-                                <button onClick={handleSaveQuiz} disabled={loading} className="btn btn-primary" style={{ width: "100%", padding: "12px", fontSize: "1.1rem" }}>
+                                <button onClick={handleSaveSettings} disabled={loading} className="btn btn-primary" style={{ width: "100%", padding: "12px", fontSize: "1.1rem" }}>
+                                    設定を保存する
+                                </button>
+                            </div>
+                        )}
+
+                        {activeTab === "time" && (
+                            <div>
+                                <h3 style={{ marginBottom: "15px" }}>おやすみモード設定</h3>
+                                <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "20px" }}>
+                                    指定した時間はアプリを使えなくします。（夜更かし防止など）
+                                </p>
+
+                                <div style={{ marginBottom: "20px" }}>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={usageLimit.enabled}
+                                            onChange={(e) => setUsageLimit({ ...usageLimit, enabled: e.target.checked })}
+                                            style={{ transform: "scale(1.5)" }}
+                                        />
+                                        機能を有効にする
+                                    </label>
+                                </div>
+
+                                {usageLimit.enabled && (
+                                    <div style={{ background: "#f8f9fa", padding: "20px", borderRadius: "10px" }}>
+                                        <div style={{ marginBottom: "15px" }}>
+                                            <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>開始時間（寝る時間）</label>
+                                            <input
+                                                type="time"
+                                                value={usageLimit.start}
+                                                onChange={(e) => setUsageLimit({ ...usageLimit, start: e.target.value })}
+                                                style={{ fontSize: "1.2rem", padding: "5px" }}
+                                            />
+                                        </div>
+                                        <div style={{ marginBottom: "15px" }}>
+                                            <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>終了時間（起きる時間）</label>
+                                            <input
+                                                type="time"
+                                                value={usageLimit.end}
+                                                onChange={(e) => setUsageLimit({ ...usageLimit, end: e.target.value })}
+                                                style={{ fontSize: "1.2rem", padding: "5px" }}
+                                            />
+                                        </div>
+                                        <p style={{ color: "red", fontSize: "0.9rem" }}>
+                                            ※ {usageLimit.start} から {usageLimit.end} の間はアプリが開けなくなります。
+                                        </p>
+                                    </div>
+                                )}
+
+                                <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #eee" }} />
+
+                                <h3 style={{ marginBottom: "15px" }}>ペット機能</h3>
+                                <div style={{ marginBottom: "20px" }}>
+                                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={showPets}
+                                            onChange={(e) => setShowPets(e.target.checked)}
+                                            style={{ transform: "scale(1.5)" }}
+                                        />
+                                        ペットを表示する
+                                    </label>
+                                    <p style={{ fontSize: "0.9rem", color: "#666", marginTop: "5px", marginLeft: "28px" }}>
+                                        チェックを外すと、ペットのお世話や表示が隠れます。
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={handleSaveSettings}
+                                    disabled={loading}
+                                    className="btn btn-primary"
+                                    style={{ width: "100%", padding: "12px", marginTop: "20px" }}
+                                >
                                     設定を保存する
                                 </button>
                             </div>
@@ -374,6 +481,86 @@ export default function ParentSettings({ isOpen, onClose }) {
                                 >
                                     送信する
                                 </button>
+                            </div>
+                        )}
+
+                        {activeTab === "affiliation" && (
+                            <div>
+                                <h3 style={{ marginBottom: "15px" }}>所属の設定</h3>
+                                <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "20px" }}>
+                                    所属を設定すると、同じ所属のお友達やグループだけが表示されるようになります。<br />
+                                    「所属なし（共通）」を選ぶと、誰とでも交流できるパブリックエリアになります。
+                                </p>
+
+                                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    {affiliations.map(aff => {
+                                        const isSelected = selectedAffiliation === aff.id || (!selectedAffiliation && aff.id === "default");
+                                        return (
+                                            <label key={aff.id} style={{
+                                                display: "flex", alignItems: "center", padding: "15px",
+                                                border: `2px solid ${isSelected ? "var(--primary)" : "#eee"} `,
+                                                borderRadius: "10px", cursor: "pointer",
+                                                backgroundColor: isSelected ? "#fff9f0" : "white",
+                                                transition: "all 0.2s"
+                                            }}>
+                                                <input
+                                                    type="radio"
+                                                    name="affiliation"
+                                                    value={aff.id}
+                                                    checked={isSelected}
+                                                    onChange={() => setSelectedAffiliation(aff.id)}
+                                                    style={{ marginRight: "10px", transform: "scale(1.5)" }}
+                                                />
+                                                <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{aff.name}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    id="tutorial-save-affiliation-btn"
+                                    onClick={handleSaveSettings}
+                                    disabled={loading}
+                                    className="btn btn-primary"
+                                    style={{ width: "100%", padding: "12px", marginTop: "20px" }}
+                                >
+                                    設定を保存する
+                                </button>
+                            </div>
+                        )}
+
+                        {activeTab === "release" && (
+                            <div>
+                                <h3 style={{ marginBottom: "15px" }}>🚀 リリースノート</h3>
+                                <div style={{
+                                    backgroundColor: "#f9f9f9",
+                                    padding: "20px",
+                                    borderRadius: "15px",
+                                    fontSize: "0.95rem",
+                                    lineHeight: "1.6",
+                                    maxHeight: "400px",
+                                    overflowY: "auto",
+                                    border: "1px solid #eee"
+                                }}>
+                                    <h4 style={{ color: "var(--primary)", borderBottom: "2px solid var(--primary)", paddingBottom: "5px" }}>v1.0.0 (初回リリース)</h4>
+                                    <p style={{ marginTop: "10px" }}>子供たちのための、やさしくて楽しいSNS「**にこにこひろば（Nikohiro）**」へようこそ！</p>
+
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🌟 ニコヒロとは？</h5>
+                                    <p>言葉の大切さを学びながら、安心してお友達や家族とつながることができる子供向けSNSです。NGワードチェックや算数クイズを通じて、「考える力」と「思いやりの心」を育みます。</p>
+
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🚀 主な機能</h5>
+                                    <ul style={{ paddingLeft: "20px" }}>
+                                        <li><strong>きもちの投稿</strong>: 20種類以上の絵文字から気分を選んで投稿。</li>
+                                        <li><strong>にこにこペット</strong>: 成長する相棒！投稿で貯まる経験値でペットが進化します。（成長は一日一回です）</li>
+                                        <li><strong>グループ/所属機能</strong>: 学校や習い事など、自分たちのコミュニティで交流。</li>
+                                        <li><strong>セーフティフィルター</strong>: 傷つける言葉を自動検知してアドバイス。</li>
+                                        <li><strong>算数クイズ連携</strong>: 投稿前の暗算で学習習慣をサポート。</li>
+                                    </ul>
+
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🏁 はじめかた</h5>
+                                    <p>新規登録後のチュートリアルで、使い方を楽しくスムーズに学ぶことができます。</p>
+                                </div>
                             </div>
                         )}
 
