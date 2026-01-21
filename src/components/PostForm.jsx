@@ -118,67 +118,83 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
         const settingMax = quizSettings?.maxAnswer || 10;
         const max = Math.min(settingMax, 99);
 
+        // Supported custom types
+        const SUPPORTED_TYPES = ["shape_10frame", "shape_blocks", "lang_opposites", "lang_odd_one"];
+        const validTypes = types.filter(t => SUPPORTED_TYPES.includes(t));
+
         // All possible quiz "logics"
         const availablePool = [];
         if (ops.length > 0) availablePool.push("arithmetic");
-        types.forEach(t => availablePool.push(t));
+        validTypes.forEach(t => availablePool.push(t));
 
         // Default to arithmetic if pool is empty
-        const selectedType = availablePool.length > 0
+        let selectedType = availablePool.length > 0
             ? availablePool[Math.floor(Math.random() * availablePool.length)]
             : "arithmetic";
 
         let q = "", a = "", choices = null, visual = null;
 
-        if (selectedType === "arithmetic") {
-            const op = ops[Math.floor(Math.random() * ops.length)] || "add";
-            if (op === "add") {
-                const total = Math.floor(Math.random() * (max - 1)) + 2;
-                const first = Math.floor(Math.random() * (total - 1)) + 1;
-                const second = total - first;
-                q = `${first} + ${second} = ?`;
-                a = total.toString();
-            } else if (op === "sub") {
-                const first = Math.floor(Math.random() * (max - 1)) + 2;
-                const second = Math.floor(Math.random() * (first - 1)) + 1;
-                q = `${first} - ${second} = ?`;
-                a = (first - second).toString();
-            } else if (op === "mul") {
-                const first = Math.floor(Math.random() * 9) + 1;
-                const second = Math.floor(Math.random() * 9) + 1;
-                q = `${first} × ${second} = ?`;
-                a = (first * second).toString();
-            } else if (op === "div") {
-                const ans = Math.floor(Math.random() * 9) + 1;
-                const devisor = Math.floor(Math.random() * 9) + 1;
-                q = `${ans * devisor} ÷ ${devisor} = ?`;
-                a = ans.toString();
+        // Loop once or twice to ensure q is not empty (fallback to arithmetic)
+        for (let attempt = 0; attempt < 2; attempt++) {
+            if (selectedType === "arithmetic") {
+                const op = ops[Math.floor(Math.random() * ops.length)] || "add";
+                if (op === "add") {
+                    const total = Math.floor(Math.random() * (Math.max(2, max) - 1)) + 2;
+                    const first = Math.floor(Math.random() * (total - 1)) + 1;
+                    const second = total - first;
+                    q = `${first} + ${second} = ?`;
+                    a = total.toString();
+                } else if (op === "sub") {
+                    const first = Math.floor(Math.random() * (Math.max(2, max) - 1)) + 2;
+                    const second = Math.floor(Math.random() * (first - 1)) + 1;
+                    q = `${first} - ${second} = ?`;
+                    a = (first - second).toString();
+                } else if (op === "mul") {
+                    const first = Math.floor(Math.random() * 9) + 1;
+                    const second = Math.floor(Math.random() * 9) + 1;
+                    q = `${first} × ${second} = ?`;
+                    a = (first * second).toString();
+                } else if (op === "div") {
+                    const ans = Math.floor(Math.random() * 9) + 1;
+                    const devisor = Math.floor(Math.random() * 9) + 1;
+                    q = `${ans * devisor} ÷ ${devisor} = ?`;
+                    a = ans.toString();
+                }
             }
+            else if (selectedType === "shape_10frame") {
+                const count = Math.floor(Math.random() * 9) + 1;
+                const remaining = 10 - count;
+                q = "あと いくつで 10 になるかな？";
+                a = remaining.toString();
+                visual = { type: "10frame", count };
+                choices = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+            }
+            else if (selectedType === "shape_blocks") {
+                const count = Math.floor(Math.random() * 5) + 3;
+                q = "つみきは ぜんぶで いくつあるかな？";
+                a = count.toString();
+                visual = { type: "blocks", count };
+                choices = ["3", "4", "5", "6", "7", "8"];
+            }
+            else if (selectedType === "lang_opposites") {
+                const list = LANGUAGE_QUIZZES.opposites;
+                const pick = list[Math.floor(Math.random() * list.length)];
+                q = pick.q; a = pick.a; choices = pick.c;
+            }
+            else if (selectedType === "lang_odd_one") {
+                const list = LANGUAGE_QUIZZES.oddOneOut;
+                const pick = list[Math.floor(Math.random() * list.length)];
+                q = pick.q; a = pick.a; choices = pick.c;
+            }
+
+            if (q) break; // Success
+            selectedType = "arithmetic"; // Fallback for next attempt
         }
-        else if (selectedType === "shape_10frame") {
-            const count = Math.floor(Math.random() * 9) + 1; // 1-9
-            const remaining = 10 - count;
-            q = "あと いくつで 10 になるかな？";
-            a = remaining.toString();
-            visual = { type: "10frame", count };
-            choices = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-        }
-        else if (selectedType === "shape_blocks") {
-            const count = Math.floor(Math.random() * 5) + 3; // 3-7
-            q = "つみきは ぜんぶで いくつあるかな？";
-            a = count.toString();
-            visual = { type: "blocks", count };
-            choices = ["3", "4", "5", "6", "7", "8"];
-        }
-        else if (selectedType === "lang_opposites") {
-            const list = LANGUAGE_QUIZZES.opposites;
-            const pick = list[Math.floor(Math.random() * list.length)];
-            q = pick.q; a = pick.a; choices = pick.c;
-        }
-        else if (selectedType === "lang_odd_one") {
-            const list = LANGUAGE_QUIZZES.oddOneOut;
-            const pick = list[Math.floor(Math.random() * list.length)];
-            q = pick.q; a = pick.a; choices = pick.c;
+
+        // Final safety fallback
+        if (!q) {
+            q = "1 + 1 = ?";
+            a = "2";
         }
 
         setCurrentQuiz({ q, a, choices, visual });
