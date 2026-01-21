@@ -332,7 +332,7 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
                     background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100
                 }}>
                     <div style={{ background: "white", padding: "25px", borderRadius: "25px", textAlign: "center", width: "95%", maxWidth: "380px", boxShadow: "0 15px 50px rgba(0,0,0,0.3)" }}>
-                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>きもちクイズ！</h3>
+                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>ニコニコクイズ！</h3>
 
                         <p style={{ fontSize: "1.2rem", fontWeight: "bold", marginBottom: "10px" }}>{currentQuiz.q}</p>
 
