@@ -18,10 +18,10 @@ export default function ParentSettings({ isOpen, onClose }) {
     const [activeTab, setActiveTab] = useState("quiz"); // "quiz" or "password"
     const [loading, setLoading] = useState(false);
 
-    // Quiz Settings
     const [quizSettings, setQuizSettings] = useState({
         maxAnswer: 20,
-        operations: ["add", "sub"]
+        operations: ["add", "sub"],
+        categories: ["arithmetic"] // default
     });
 
     // Password Settings
@@ -159,6 +159,17 @@ export default function ParentSettings({ isOpen, onClose }) {
         });
     };
 
+    const toggleArrayItem = (key, item) => {
+        setQuizSettings(prev => {
+            const current = prev[key] || [];
+            if (current.includes(item)) {
+                return { ...prev, [key]: current.filter(i => i !== item) };
+            } else {
+                return { ...prev, [key]: [...current, item] };
+            }
+        });
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -235,55 +246,77 @@ export default function ParentSettings({ isOpen, onClose }) {
                         </div>
 
                         {activeTab === "quiz" && (
-                            <div>
-                                <div style={{ marginBottom: "20px" }}>
-                                    <label style={{ display: "block", fontWeight: "bold", marginBottom: "10px" }}>出題する計算</label>
-                                    <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                            <input type="checkbox" checked={quizSettings.operations?.includes("add")} onChange={() => toggleOperation("add")} style={{ transform: "scale(1.5)", marginRight: "8px" }} />
-                                            たしざん (+)
+                            <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
+                                {/* 1. Arithmetic & Shapes */}
+                                <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
+                                    <h4 style={{ margin: "0 0 15px 0", color: "var(--primary)", borderBottom: "2px solid var(--primary-light)", display: "inline-block" }}>🔢 算数・図形</h4>
+
+                                    <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>計算（けいさん）</label>
+                                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                                            {["add", "sub", "mul", "div"].map(op => (
+                                                <label key={op} style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                                    <input type="checkbox" checked={quizSettings.operations?.includes(op)} onChange={() => toggleOperation(op)} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                                    {op === "add" ? "たしざん (+)" : op === "sub" ? "ひきざん (-)" : op === "mul" ? "かけざん (×)" : "わりざん (÷)"}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>図形（ずけい）</label>
+                                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                                <input type="checkbox" checked={quizSettings.types?.includes("shape_10frame")} onChange={() => toggleArrayItem("types", "shape_10frame")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                                あといくつで10？
+                                            </label>
+                                            <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                                <input type="checkbox" checked={quizSettings.types?.includes("shape_blocks")} onChange={() => toggleArrayItem("types", "shape_blocks")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                                積み木 数え
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: "10px" }}>
+                                        <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>答えの最大数 (1〜100)</label>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <input type="range" min="1" max="100" value={quizSettings.maxAnswer} onChange={(e) => setQuizSettings({ ...quizSettings, maxAnswer: parseInt(e.target.value) })} style={{ flex: 1 }} />
+                                            <span style={{ fontWeight: "bold", fontSize: "1.1rem", width: "40px" }}>{quizSettings.maxAnswer}</span>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* 2. Language */}
+                                <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
+                                    <h4 style={{ margin: "0 0 15px 0", color: "#e67e22", borderBottom: "2px solid #ffedd5", display: "inline-block" }}>📚 ことば・語彙</h4>
+                                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input type="checkbox" checked={quizSettings.types?.includes("lang_opposites")} onChange={() => toggleArrayItem("types", "lang_opposites")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                            反対のことば
                                         </label>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                            <input type="checkbox" checked={quizSettings.operations?.includes("sub")} onChange={() => toggleOperation("sub")} style={{ transform: "scale(1.5)", marginRight: "8px" }} />
-                                            ひきざん (-)
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                            <input type="checkbox" checked={quizSettings.operations?.includes("mul")} onChange={() => toggleOperation("mul")} style={{ transform: "scale(1.5)", marginRight: "8px" }} />
-                                            かけざん (×)
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-                                            <input type="checkbox" checked={quizSettings.operations?.includes("div")} onChange={() => toggleOperation("div")} style={{ transform: "scale(1.5)", marginRight: "8px" }} />
-                                            わりざん (÷)
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input type="checkbox" checked={quizSettings.types?.includes("lang_odd_one")} onChange={() => toggleArrayItem("types", "lang_odd_one")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                            仲間外れ探し
                                         </label>
                                     </div>
-                                </div>
+                                </section>
 
-                                <div style={{ marginBottom: "30px" }}>
-                                    <label style={{ display: "block", fontWeight: "bold", marginBottom: "10px" }}>
-                                        答えの最大数 (1〜100)
-                                    </label>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                        <input
-                                            type="range"
-                                            min="1" max="100"
-                                            value={quizSettings.maxAnswer}
-                                            onChange={(e) => setQuizSettings({ ...quizSettings, maxAnswer: parseInt(e.target.value) })}
-                                            style={{ flex: 1 }}
-                                        />
-                                        <input
-                                            type="number"
-                                            min="1" max="100"
-                                            value={quizSettings.maxAnswer}
-                                            onChange={(e) => setQuizSettings({ ...quizSettings, maxAnswer: parseInt(e.target.value) })}
-                                            style={{ width: "60px", padding: "5px", fontSize: "1.2rem", textAlign: "center" }}
-                                        />
+                                {/* 3. Science */}
+                                <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
+                                    <h4 style={{ margin: "0 0 15px 0", color: "#27ae60", borderBottom: "2px solid #dcfce7", display: "inline-block" }}>🌱 科学・せいかつ</h4>
+                                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input type="checkbox" checked={quizSettings.types?.includes("sci_sequence")} onChange={() => toggleArrayItem("types", "sci_sequence")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                            じゅんばん並べ
+                                        </label>
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input type="checkbox" checked={quizSettings.types?.includes("sci_balance")} onChange={() => toggleArrayItem("types", "sci_balance")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
+                                            どっちが重い？
+                                        </label>
                                     </div>
-                                    <p style={{ fontSize: "0.8rem", color: "#666", marginTop: "5px" }}>
-                                        ※ この数字より大きい答えにはなりません。
-                                    </p>
-                                </div>
+                                </section>
 
-                                <button onClick={handleSaveQuiz} disabled={loading} className="btn btn-primary" style={{ width: "100%", padding: "12px" }}>
+                                <button onClick={handleSaveQuiz} disabled={loading} className="btn btn-primary" style={{ width: "100%", padding: "12px", fontSize: "1.1rem" }}>
                                     設定を保存する
                                 </button>
                             </div>

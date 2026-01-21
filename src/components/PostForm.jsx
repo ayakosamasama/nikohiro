@@ -112,70 +112,110 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
     };
 
     const generateQuiz = () => {
-        const ops = quizSettings?.operations?.length > 0 ? quizSettings.operations : ["add"];
-        const settingMax = quizSettings?.maxAnswer || 2;
-        // Ensure the answer (and operands) don't exceed 2 digits (99)
+        const types = quizSettings?.types || [];
+        const ops = quizSettings?.operations || ["add"];
+        const settingMax = quizSettings?.maxAnswer || 10;
         const max = Math.min(settingMax, 99);
 
-        // Retry logic to ensure valid question
-        let q = "", a = 0;
-        let isValid = false;
-        let attempts = 0;
+        // All possible quiz "logics"
+        const availablePool = [];
+        if (ops.length > 0) availablePool.push("arithmetic");
+        types.forEach(t => availablePool.push(t));
 
-        while (!isValid && attempts < 10) {
-            attempts++;
-            const op = ops[Math.floor(Math.random() * ops.length)];
+        // Default to arithmetic if pool is empty
+        const selectedType = availablePool.length > 0
+            ? availablePool[Math.floor(Math.random() * availablePool.length)]
+            : "arithmetic";
 
+        let q = "", a = "", choices = null, visual = null;
+
+        if (selectedType === "arithmetic") {
+            const op = ops[Math.floor(Math.random() * ops.length)] || "add";
             if (op === "add") {
-                const total = Math.floor(Math.random() * (max - 1)) + 2; // 2 to max
-                const first = Math.floor(Math.random() * (total - 1)) + 1; // 1 to total-1
+                const total = Math.floor(Math.random() * (max - 1)) + 2;
+                const first = Math.floor(Math.random() * (total - 1)) + 1;
                 const second = total - first;
                 q = `${first} + ${second} = ?`;
-                a = total;
-                isValid = true;
+                a = total.toString();
             } else if (op === "sub") {
-                const first = Math.floor(Math.random() * (max - 2)) + 2; // 2 to max
-                const second = Math.floor(Math.random() * (first - 1)) + 1; // 1 to first-1
+                const first = Math.floor(Math.random() * (max - 1)) + 2;
+                const second = Math.floor(Math.random() * (first - 1)) + 1;
                 q = `${first} - ${second} = ?`;
-                a = first - second;
-                isValid = true;
+                a = (first - second).toString();
             } else if (op === "mul") {
-                const first = Math.floor(Math.random() * 9) + 1; // 1-9
-                const second = Math.floor(Math.random() * 9) + 1; // 1-9
-                if (first * second <= max) {
-                    q = `${first} × ${second} = ?`;
-                    a = first * second;
-                    isValid = true;
-                }
+                const first = Math.floor(Math.random() * 9) + 1;
+                const second = Math.floor(Math.random() * 9) + 1;
+                q = `${first} × ${second} = ?`;
+                a = (first * second).toString();
             } else if (op === "div") {
-                const ans = Math.floor(Math.random() * 9) + 1; // 1-9
-                const devisor = Math.floor(Math.random() * 9) + 1; // 1-9
-                const dividend = ans * devisor;
-                if (dividend <= max) {
-                    q = `${dividend} ÷ ${devisor} = ?`;
-                    a = ans;
-                    isValid = true;
-                }
+                const ans = Math.floor(Math.random() * 9) + 1;
+                const devisor = Math.floor(Math.random() * 9) + 1;
+                q = `${ans * devisor} ÷ ${devisor} = ?`;
+                a = ans.toString();
             }
         }
-
-        // Fallback
-        if (!isValid) {
-            q = "1 + 1 = ?";
-            a = 2;
+        else if (selectedType === "shape_10frame") {
+            const count = Math.floor(Math.random() * 9) + 1; // 1-9
+            const remaining = 10 - count;
+            q = "あといくつで 10 になる？";
+            a = remaining.toString();
+            visual = { type: "10frame", count };
+            choices = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+        }
+        else if (selectedType === "shape_blocks") {
+            const count = Math.floor(Math.random() * 5) + 3; // 3-7
+            q = "積み木は 全部でいくつある？";
+            a = count.toString();
+            visual = { type: "blocks", count };
+            choices = ["3", "4", "5", "6", "7", "8"];
+        }
+        else if (selectedType === "lang_opposites") {
+            const pairs = [
+                { q: "「大きい」の反対は？", a: "ちいさい", c: ["ちいさい", "ながい", "おもい"] },
+                { q: "「長い」の反対は？", a: "みじかい", c: ["みじかい", "ひくい", "おそい"] },
+                { q: "「重い」の反対は？", a: "かるい", c: ["かるい", "あかるい", "はやい"] },
+                { q: "「明るい」の反対は？", a: "くらい", c: ["くらい", "さむい", "きれいい"] },
+                { q: "「高い」の反対は？", a: "ひくい", c: ["ひくい", "ふとい", "おもい"] }
+            ];
+            const pick = pairs[Math.floor(Math.random() * pairs.length)];
+            q = pick.q; a = pick.a; choices = pick.c;
+        }
+        else if (selectedType === "lang_odd_one") {
+            const sets = [
+                { q: "なかまはずれは どれ？", a: "くるま", c: ["りんご", "みかん", "くるま", "バナナ"] },
+                { q: "なかまはずれは どれ？", a: "ねこ", c: ["えんぴつ", "ねこ", "消しゴム", "ノート"] },
+                { q: "なかまはずれは どれ？", a: "ひこうき", c: ["サメ", "くじら", "ひこうき", "イルカ"] }
+            ];
+            const pick = sets[Math.floor(Math.random() * sets.length)];
+            q = pick.q; a = pick.a; choices = pick.c;
+        }
+        else if (selectedType === "sci_sequence") {
+            const sets = [
+                { q: "花がさくまでの 順番は？", a: "種→芽→花", c: ["種→芽→花", "芽→種→花", "花→芽→種"] },
+                { q: "ごはんを食べる 順番は？", a: "用意→食べる→片付け", c: ["食べる→用意→片付け", "用意→食べる→片付け", "片付け→用意→食べる"] }
+            ];
+            const pick = sets[Math.floor(Math.random() * sets.length)];
+            q = pick.q; a = pick.a; choices = pick.c;
+        }
+        else if (selectedType === "sci_balance") {
+            q = "シーソーを見て、重い方をあててね";
+            a = "ぞう";
+            choices = ["ぞう", "ねずみ"];
+            visual = { type: "balance", left: "ぞう", right: "ねずみ", heavier: "left" };
         }
 
-        setCurrentQuiz({ q, a });
+        setCurrentQuiz({ q, a, choices, visual });
         setQuizAnswer("");
         setIsQuizOpen(true);
     };
 
-    const submitQuiz = async () => {
-        if (parseInt(quizAnswer) === currentQuiz.a) {
+    const submitQuiz = async (choiceValue = null) => {
+        const answerToCheck = choiceValue !== null ? choiceValue : quizAnswer;
+        if (answerToCheck.toString() === currentQuiz.a.toString()) {
             setIsQuizOpen(false);
             try {
-                const postName = name || user.email.split("@")[0];
-                const postIcon = user.photoURL || null; // Use Auth photoURL (which is synced) or null
+                const postName = name || (user.email ? user.email.split("@")[0] : "ゲスト");
+                const postIcon = user.photoURL || null;
                 await addPost(user.uid, postName, postIcon, selectedMood, text, userGroups);
                 setText("");
                 setQuizAnswer("");
@@ -187,6 +227,46 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
             alert("ざんねん！もういちどチャレンジしてね");
             setQuizAnswer("");
         }
+    };
+
+    const renderQuizVisual = () => {
+        if (!currentQuiz.visual) return null;
+        const { type } = currentQuiz.visual;
+
+        if (type === "10frame") {
+            const dots = [];
+            for (let i = 0; i < 10; i++) {
+                dots.push(i < currentQuiz.visual.count);
+            }
+            return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "5px", background: "#f0f0f0", padding: "10px", borderRadius: "8px", margin: "10px auto" }}>
+                    {dots.map((isFilled, idx) => (
+                        <div key={idx} style={{ width: "30px", height: "30px", borderRadius: "50%", background: isFilled ? "var(--primary)" : "white", border: "2px solid #ddd" }}></div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (type === "blocks") {
+            return (
+                <div style={{ fontSize: "2rem", margin: "10px 0" }}>
+                    {"🟥".repeat(currentQuiz.visual.count)}
+                </div>
+            );
+        }
+
+        if (type === "balance") {
+            return (
+                <div style={{ margin: "15px 0", fontSize: "1.2rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end", height: "60px" }}>
+                        <div style={{ transform: currentQuiz.visual.heavier === "left" ? "translateY(10px)" : "translateY(-10px)" }}>🛒 {currentQuiz.visual.left}</div>
+                        <div style={{ transform: currentQuiz.visual.heavier === "right" ? "translateY(10px)" : "translateY(-10px)" }}>🛒 {currentQuiz.visual.right}</div>
+                    </div>
+                    <div style={{ height: "4px", background: "#666", width: "100%", transform: currentQuiz.visual.heavier === "left" ? "rotate(5deg)" : "rotate(-5deg)" }}></div>
+                </div>
+            );
+        }
+        return null;
     };
 
     const handleMoodSelect = (mood) => {
@@ -269,21 +349,47 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
                     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
                     background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100
                 }}>
-                    <div style={{ background: "white", padding: "30px", borderRadius: "var(--radius-lg)", textAlign: "center", width: "90%", maxWidth: "350px" }}>
-                        <span style={{ fontSize: "3rem", display: "block", marginBottom: "10px" }}>✏️</span>
-                        <h3 style={{ marginBottom: "20px" }}>けいさんクイズ！</h3>
-                        <p style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "20px" }}>{currentQuiz.q}</p>
-                        <input
-                            type="number"
-                            value={quizAnswer}
-                            onChange={(e) => setQuizAnswer(e.target.value)}
-                            style={{ padding: "10px", fontSize: "1.2rem", width: "100px", textAlign: "center", marginBottom: "20px" }}
-                            autoFocus
-                        />
-                        <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                            <button className="btn" style={{ background: "#ccc" }} onClick={() => setIsQuizOpen(false)}>やめる</button>
-                            <button className="btn btn-primary" onClick={submitQuiz}>こたえる</button>
+                    <div style={{ background: "white", padding: "25px", borderRadius: "25px", textAlign: "center", width: "95%", maxWidth: "380px", boxShadow: "0 15px 50px rgba(0,0,0,0.3)" }}>
+                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>きもちクイズ！</h3>
+
+                        <p style={{ fontSize: "1.2rem", fontWeight: "bold", marginBottom: "10px" }}>{currentQuiz.q}</p>
+
+                        {renderQuizVisual()}
+
+                        <div style={{ marginTop: "20px" }}>
+                            {currentQuiz.choices ? (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    {currentQuiz.choices.map(choice => (
+                                        <button
+                                            key={choice}
+                                            className="btn"
+                                            style={{ background: "#f8f9fa", border: "2px solid #eee", fontSize: "1.1rem", padding: "12px" }}
+                                            onClick={() => submitQuiz(choice)}
+                                        >
+                                            {choice}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <>
+                                    <input
+                                        type="number"
+                                        value={quizAnswer}
+                                        onChange={(e) => setQuizAnswer(e.target.value)}
+                                        style={{ padding: "12px", fontSize: "1.5rem", width: "120px", textAlign: "center", marginBottom: "20px", border: "2px solid var(--primary)", borderRadius: "10px" }}
+                                        autoFocus
+                                    />
+                                    <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                                        <button className="btn" style={{ background: "#ccc" }} onClick={() => setIsQuizOpen(false)}>やめる</button>
+                                        <button className="btn btn-primary" onClick={() => submitQuiz()}>こたえる</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
+
+                        {currentQuiz.choices && (
+                            <button onClick={() => setIsQuizOpen(false)} style={{ marginTop: "15px", background: "none", border: "none", color: "#666", textDecoration: "underline", cursor: "pointer" }}>やめる</button>
+                        )}
                     </div>
                 </div>
             )}
