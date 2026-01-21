@@ -196,7 +196,7 @@ export default function PostForm({ userGroups = [] }) {
     return (
         <div style={{ background: "white", padding: "20px", borderRadius: "16px", boxShadow: "0 4px 15px rgba(0,0,0,0.05)", marginBottom: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-                <h3 style={{ margin: 0, color: "#2d3436", fontSize: "1.1rem" }}>＼ 今日のきもちは？ ／</h3>
+                <h3 style={{ margin: 0, color: "#2d3436", fontSize: "1.1rem" }}>＼ きょうのきもちは？ ／</h3>
                 <small style={{ color: "#b2bec3" }}>
                     こんにちは、{name}さん (Lv.{quizSettings.maxAnswer})
                 </small>

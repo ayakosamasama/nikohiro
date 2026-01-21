@@ -38,7 +38,7 @@ const TUTORIAL_STEPS = [
     },
     {
         title: "3. テスト投稿",
-        content: "「🏠 ひろば」に戻ってきました。\nここで「今日のきもちは？」から絵文字を選んで投稿できます。\n（※実際には投稿せずに次へ進みます）",
+        content: "「🏠 ひろば」に戻ってきました。\nここで「きょうのきもちは？」から絵文字を選んで投稿できます。\n（※実際には投稿せずに次へ進みます）",
         emoji: "📝",
         targetId: "tutorial-mood-area",
         action: "next"
