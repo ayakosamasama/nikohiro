@@ -197,12 +197,6 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
             const pick = sets[Math.floor(Math.random() * sets.length)];
             q = pick.q; a = pick.a; choices = pick.c;
         }
-        else if (selectedType === "sci_balance") {
-            q = "シーソーを見て、重い方をあててね";
-            a = "ぞう";
-            choices = ["ぞう", "ねずみ"];
-            visual = { type: "balance", left: "ぞう", right: "ねずみ", heavier: "left" };
-        }
 
         setCurrentQuiz({ q, a, choices, visual });
         setQuizAnswer("");
@@ -251,18 +245,6 @@ export default function PostForm({ userGroups = [], onClose, onSuccess }) {
             return (
                 <div style={{ fontSize: "2rem", margin: "10px 0" }}>
                     {"🟥".repeat(currentQuiz.visual.count)}
-                </div>
-            );
-        }
-
-        if (type === "balance") {
-            return (
-                <div style={{ margin: "15px 0", fontSize: "1.2rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end", height: "60px" }}>
-                        <div style={{ transform: currentQuiz.visual.heavier === "left" ? "translateY(10px)" : "translateY(-10px)" }}>🛒 {currentQuiz.visual.left}</div>
-                        <div style={{ transform: currentQuiz.visual.heavier === "right" ? "translateY(10px)" : "translateY(-10px)" }}>🛒 {currentQuiz.visual.right}</div>
-                    </div>
-                    <div style={{ height: "4px", background: "#666", width: "100%", transform: currentQuiz.visual.heavier === "left" ? "rotate(5deg)" : "rotate(-5deg)" }}></div>
                 </div>
             );
         }

@@ -309,10 +309,6 @@ export default function ParentSettings({ isOpen, onClose }) {
                                             <input type="checkbox" checked={quizSettings.types?.includes("sci_sequence")} onChange={() => toggleArrayItem("types", "sci_sequence")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
                                             じゅんばん並べ
                                         </label>
-                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
-                                            <input type="checkbox" checked={quizSettings.types?.includes("sci_balance")} onChange={() => toggleArrayItem("types", "sci_balance")} style={{ transform: "scale(1.3)", marginRight: "6px" }} />
-                                            どっちが重い？
-                                        </label>
                                     </div>
                                 </section>
 
