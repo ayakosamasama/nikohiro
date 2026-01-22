@@ -292,18 +292,33 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
     };
 
     return (
-        <div style={{ background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.1)", position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-                <h3 style={{ margin: 0, color: "#2d3436", fontSize: "1.1rem" }}>＼ きょうのきもちは？ ／</h3>
+        <div className="animate-pop" style={{
+            background: "white",
+            padding: "25px",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: "var(--shadow-lg)",
+            position: "relative",
+            border: "1px solid rgba(0,0,0,0.05)"
+        }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <h3 style={{ margin: 0, color: "var(--primary)", fontSize: "1.2rem", fontWeight: "900" }}>
+                    ＼ きょうのきもちは？ ／
+                </h3>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <small style={{ color: "#b2bec3" }}>
-                        Lv.{quizSettings.maxAnswer}
-                    </small>
                     {onClose && (
                         <button
                             id="tutorial-post-close-btn"
                             onClick={onClose}
-                            style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: "30px", height: "30px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", color: "#636e72" }}
+                            className="btn"
+                            style={{
+                                background: "rgba(0,0,0,0.05)",
+                                width: "36px",
+                                height: "36px",
+                                padding: 0,
+                                color: "var(--text-muted)",
+                                fontSize: "1.2rem",
+                                boxShadow: "none"
+                            }}
                         >
                             ×
                         </button>
@@ -311,27 +326,33 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                 </div>
             </div>
 
-            <div id="tutorial-mood-area" style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "15px", maxHeight: "200px", overflowY: "auto", padding: "4px" }}>
+            <div id="tutorial-mood-area" style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginBottom: "20px",
+                maxHeight: "220px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "rgba(0,0,0,0.02)",
+                borderRadius: "var(--radius-md)"
+            }}>
                 {MOODS.map((mood) => (
                     <button
                         key={mood.label}
                         onClick={() => handleMoodSelect(mood)}
+                        className="btn"
                         style={{
-                            background: selectedMood.label === mood.label ? "var(--primary-light)" : "#f8f9fa",
-                            border: selectedMood.label === mood.label ? "2px solid var(--primary)" : "2px solid transparent",
-                            borderRadius: "12px",
+                            background: selectedMood.label === mood.label ? "var(--primary)" : "white",
+                            border: "none",
+                            borderRadius: "16px",
                             padding: "6px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            minWidth: "48px",
-                            height: "48px",
-                            fontSize: "1.6rem",
-                            transition: "transform 0.1s"
+                            width: "52px",
+                            height: "52px",
+                            fontSize: "2rem",
+                            boxShadow: selectedMood.label === mood.label ? "var(--shadow-md)" : "var(--shadow-sm)",
+                            transform: selectedMood.label === mood.label ? "scale(1.1)" : "none"
                         }}
-                        onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.95)"}
-                        onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
                         title={mood.label}
                     >
                         {mood.emoji}
@@ -345,14 +366,20 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                 placeholder="いまどうしてる？"
                 style={{
                     width: "100%",
-                    padding: "12px",
-                    borderRadius: "var(--radius-sm)",
-                    border: "2px solid #ddd",
-                    minHeight: "80px",
-                    marginBottom: "10px",
+                    padding: "16px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid rgba(0,0,0,0.05)",
+                    background: "rgba(0,0,0,0.01)",
+                    minHeight: "100px",
+                    marginBottom: "15px",
                     fontFamily: "inherit",
-                    fontSize: "1rem"
+                    fontSize: "1.05rem",
+                    outline: "none",
+                    transition: "border-color 0.3s",
+                    resize: "none"
                 }}
+                onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
+                onBlur={(e) => e.target.style.borderColor = "rgba(0,0,0,0.05)"}
             />
 
             <div style={{ textAlign: "right" }}>
@@ -360,31 +387,47 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                     id="tutorial-post-submit"
                     className="btn btn-primary"
                     onClick={handlePostClick}
+                    style={{
+                        padding: "14px 32px",
+                        fontSize: "1.1rem",
+                        boxShadow: "0 8px 20px rgba(var(--primary-h), 100%, 70%, 0.3)"
+                    }}
                 >
-                    とうこうする
+                    🚀 とうこうする
                 </button>
             </div>
 
             {isQuizOpen && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-                    background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100
+                    backgroundColor: "rgba(0,0,0,0.4)",
+                    backdropFilter: "blur(8px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000
                 }}>
-                    <div style={{ background: "white", padding: "25px", borderRadius: "25px", textAlign: "center", width: "95%", maxWidth: "380px", boxShadow: "0 15px 50px rgba(0,0,0,0.3)" }}>
-                        <h3 style={{ marginBottom: "15px", color: "var(--primary)" }}>にこにこクイズ！</h3>
+                    <div className="animate-pop card" style={{ padding: "30px", textAlign: "center", width: "95%", maxWidth: "400px", border: "1px solid var(--glass-border)" }}>
+                        <h3 style={{ marginBottom: "20px", color: "var(--primary)", fontSize: "1.4rem", fontWeight: "900" }}>
+                            にこにこクイズ！
+                        </h3>
 
-                        <p style={{ fontSize: "1.2rem", fontWeight: "bold", marginBottom: "10px" }}>{currentQuiz.q}</p>
+                        <p style={{ fontSize: "1.4rem", fontWeight: "900", marginBottom: "15px" }}>{currentQuiz.q}</p>
 
-                        {renderQuizVisual()}
+                        <div style={{ background: "rgba(0,0,0,0.03)", borderRadius: "var(--radius-md)", padding: "10px", marginBottom: "20px" }}>
+                            {renderQuizVisual()}
+                        </div>
 
                         <div style={{ marginTop: "20px" }}>
                             {currentQuiz.choices ? (
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                                     {currentQuiz.choices.map(choice => (
                                         <button
                                             key={choice}
                                             className="btn"
-                                            style={{ background: "#f8f9fa", border: "2px solid #eee", fontSize: "1.1rem", padding: "12px" }}
+                                            style={{
+                                                background: "white",
+                                                fontSize: "1.2rem",
+                                                padding: "15px",
+                                                border: "2px solid rgba(0,0,0,0.05)"
+                                            }}
                                             onClick={() => submitQuiz(choice)}
                                         >
                                             {choice}
@@ -397,20 +440,30 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                                         type="number"
                                         value={quizAnswer}
                                         onChange={(e) => setQuizAnswer(e.target.value)}
-                                        style={{ padding: "12px", fontSize: "1.5rem", width: "120px", textAlign: "center", marginBottom: "20px", border: "2px solid var(--primary)", borderRadius: "10px" }}
+                                        style={{
+                                            padding: "15px",
+                                            fontSize: "2rem",
+                                            width: "140px",
+                                            textAlign: "center",
+                                            marginBottom: "25px",
+                                            border: "3px solid var(--primary)",
+                                            borderRadius: "15px",
+                                            boxShadow: "var(--shadow-sm)",
+                                            outline: "none"
+                                        }}
                                         autoFocus
                                     />
-                                    <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                                        <button className="btn" style={{ background: "#ccc" }} onClick={() => setIsQuizOpen(false)}>やめる</button>
+                                    <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
+                                        <button className="btn" style={{ background: "rgba(0,0,0,0.05)", color: "var(--text-muted)" }} onClick={() => setIsQuizOpen(false)}>やめる</button>
                                         <button className="btn btn-primary" onClick={() => submitQuiz()}>こたえる</button>
                                     </div>
                                 </>
                             )}
                         </div>
 
-                        {currentQuiz.choices && (
-                            <button onClick={() => setIsQuizOpen(false)} style={{ marginTop: "15px", background: "none", border: "none", color: "#666", textDecoration: "underline", cursor: "pointer" }}>やめる</button>
-                        )}
+                        <button onClick={() => setIsQuizOpen(false)} style={{ marginTop: "20px", background: "none", border: "none", color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer", fontSize: "0.9rem" }}>
+                            やめる
+                        </button>
                     </div>
                 </div>
             )}

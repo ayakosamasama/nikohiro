@@ -21,6 +21,9 @@ export const PETS = {
     pet03: { name: "うさぎタイプ", id: "pet03" },
     pet04: { name: "くまタイプ", id: "pet04" },
     pet05: { name: "とりタイプ", id: "pet05" },
+    pet06: { name: "ハムスタータイプ", id: "pet06" },
+    pet07: { name: "ぺんぎんタイプ", id: "pet07" },
+    pet08: { name: "ドラゴンタイプ", id: "pet08" },
 };
 
 export const getPetImage = (petId, level) => {

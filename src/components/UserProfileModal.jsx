@@ -8,7 +8,8 @@ import PetDisplay from "./PetDisplay";
 export default function UserProfileModal({ userId, onClose }) {
     const { user } = useAuth();
     const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { user: currentUser } = useAuth(); // Get current user for their settings
+    const [loading, setLoading] = useState(false);
     const [showPets, setShowPets] = useState(true);
 
     // Check viewer's settings
@@ -42,6 +43,27 @@ export default function UserProfileModal({ userId, onClose }) {
         };
         fetchProfile();
     }, [userId]);
+
+    const handlePlayGame = () => {
+        if (!profile?.gameUrl) return;
+
+        // Use viewer's settings
+        if (currentUser?.settings?.gameFeatureEnabled === false) return;
+
+        let limit = 15; // Default
+        let totalLimit = 60; // Default
+
+        if (currentUser) {
+            if (currentUser.gameTimeLimit !== undefined) limit = currentUser.gameTimeLimit;
+            if (currentUser.totalGameTimeLimit !== undefined) totalLimit = currentUser.totalGameTimeLimit;
+        }
+
+        const url = new URL(profile.gameUrl);
+        if (limit > 0) url.searchParams.set('timeLimit', limit);
+        if (totalLimit > 0) url.searchParams.set('totalLimit', totalLimit);
+
+        window.open(url.toString(), '_blank');
+    };
 
     if (!userId) return null;
 

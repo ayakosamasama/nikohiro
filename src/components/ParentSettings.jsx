@@ -8,7 +8,7 @@ import { updatePassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
 export default function ParentSettings({ isOpen, onClose }) {
-    const { user, refreshProfile } = useAuth(); // Destructure refreshProfile
+    const { user, refreshProfile, logout } = useAuth(); // Destructure logout
 
     // Gatekeeper State
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -36,6 +36,9 @@ export default function ParentSettings({ isOpen, onClose }) {
 
     // Time Limit State
     const [usageLimit, setUsageLimit] = useState({ enabled: false, start: "21:00", end: "07:00" });
+    const [gameTimeLimit, setGameTimeLimit] = useState(15); // Default 15 minutes per session
+    const [totalGameTimeLimit, setTotalGameTimeLimit] = useState(60); // Default 60 minutes per day
+    const [gameFeatureEnabled, setGameFeatureEnabled] = useState(true); // Default true
     const [showPets, setShowPets] = useState(true);
 
     // Affiliation State
@@ -75,6 +78,16 @@ export default function ParentSettings({ isOpen, onClose }) {
                 } else {
                     setUsageLimit({ enabled: false, start: "21:00", end: "06:00" });
                 }
+                // Load Game Time Limit
+                if (profile.gameTimeLimit !== undefined) {
+                    setGameTimeLimit(profile.gameTimeLimit);
+                }
+                if (profile.totalGameTimeLimit !== undefined) {
+                    setTotalGameTimeLimit(profile.totalGameTimeLimit);
+                }
+                if (profile.settings && profile.settings.gameFeatureEnabled !== undefined) {
+                    setGameFeatureEnabled(profile.settings.gameFeatureEnabled);
+                }
                 // Load Show Pets
                 if (profile.settings && profile.settings.showPets !== undefined) {
                     setShowPets(profile.settings.showPets);
@@ -103,6 +116,9 @@ export default function ParentSettings({ isOpen, onClose }) {
             await updateUserProfile(user.uid, {
                 quizSettings,
                 usageLimit,
+                gameTimeLimit,
+                totalGameTimeLimit,
+                "settings.gameFeatureEnabled": gameFeatureEnabled,
                 "settings.showPets": showPets,
                 affiliationId: selectedAffiliation // Save selected affiliation
             });
@@ -153,6 +169,13 @@ export default function ParentSettings({ isOpen, onClose }) {
             alert("変更に失敗しました");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        if (confirm("ログアウトしますか？")) {
+            await logout();
+            onClose();
         }
     };
 
@@ -253,7 +276,7 @@ export default function ParentSettings({ isOpen, onClose }) {
                         }}>
                             {[
                                 { id: "quiz", label: "クイズ", tid: "tutorial-tab-quiz" },
-                                { id: "time", label: "利用時間", tid: "tutorial-tab-time" },
+                                { id: "time", label: "機能設定", tid: "tutorial-tab-time" },
                                 { id: "password", label: "パスワード", tid: "tutorial-tab-password" },
                                 { id: "request", label: "申請・要望", tid: "tutorial-tab-request" },
                                 { id: "affiliation", label: "所属", tid: "tutorial-tab-affiliation" },
@@ -384,6 +407,64 @@ export default function ParentSettings({ isOpen, onClose }) {
                                         </p>
                                     </div>
                                 )}
+
+
+
+                                <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+                                    <h4 style={{ marginBottom: "10px" }}>🎮 ゲーム機能の設定</h4>
+
+                                    <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={gameFeatureEnabled}
+                                                onChange={(e) => setGameFeatureEnabled(e.target.checked)}
+                                                style={{ transform: "scale(1.5)" }}
+                                            />
+                                            ゲーム機能を有効にする
+                                        </label>
+                                        <p style={{ fontSize: "0.9rem", color: "#666", marginLeft: "28px" }}>
+                                            チェックを外すと、ゲームの作成やプレイボタンが表示されなくなります。
+                                        </p>
+                                    </div>
+
+                                    {gameFeatureEnabled && (
+                                        <div style={{ marginLeft: "15px", paddingLeft: "15px", borderLeft: "3px solid #eee" }}>
+                                            <div style={{ marginBottom: "15px" }}>
+                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>1回あたりのプレイ時間</label>
+                                                <select
+                                                    value={gameTimeLimit}
+                                                    onChange={(e) => setGameTimeLimit(parseInt(e.target.value))}
+                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "5px", width: "100%" }}
+                                                >
+                                                    <option value={5}>5分</option>
+                                                    <option value={10}>10分</option>
+                                                    <option value={15}>15分</option>
+                                                    <option value={30}>30分</option>
+                                                    <option value={45}>45分</option>
+                                                    <option value={60}>60分</option>
+                                                    <option value={0}>制限なし</option>
+                                                </select>
+                                            </div>
+
+                                            <div style={{ marginBottom: "15px" }}>
+                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>1日の合計プレイ時間</label>
+                                                <select
+                                                    value={totalGameTimeLimit}
+                                                    onChange={(e) => setTotalGameTimeLimit(parseInt(e.target.value))}
+                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "5px", width: "100%" }}
+                                                >
+                                                    <option value={15}>15分</option>
+                                                    <option value={30}>30分</option>
+                                                    <option value={60}>1時間</option>
+                                                    <option value={90}>1時間30分</option>
+                                                    <option value={120}>2時間</option>
+                                                    <option value={0}>制限なし</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
                                 <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #eee" }} />
 
@@ -543,28 +624,52 @@ export default function ParentSettings({ isOpen, onClose }) {
                                     overflowY: "auto",
                                     border: "1px solid #eee"
                                 }}>
-                                    <h4 style={{ color: "var(--primary)", borderBottom: "2px solid var(--primary)", paddingBottom: "5px" }}>v1.0.0 (初回リリース)</h4>
-                                    <p style={{ marginTop: "10px" }}>子供たちのための、やさしくて楽しいSNS「**にこにこひろば（Nikohiro）**」へようこそ！</p>
+                                    <h4 style={{ color: "var(--primary)", borderBottom: "2px solid var(--primary)", paddingBottom: "5px" }}>v1.0.0-beta (初回テストリリース)</h4>
+                                    <p style={{ marginTop: "10px" }}>初回のテストリリースにて提供される、「にこにこひろば」の全機能一覧です。</p>
 
-                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🌟 ニコヒロとは？</h5>
-                                    <p>言葉の大切さを学びながら、安心してお友達や家族とつながることができる子供向けSNSです。NGワードチェックや算数クイズを通じて、「考える力」と「思いやりの心」を育みます。</p>
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>📱 アプリ機能一覧</h5>
+                                    <div style={{ paddingLeft: "10px" }}>
+                                        <p style={{ fontWeight: "bold", margin: "10px 0 5px 0" }}>💬 コミュニケーション (SNS)</p>
+                                        <ul style={{ paddingLeft: "20px" }}>
+                                            <li><strong>タイムライン</strong>: テキストを使った投稿が可能です。</li>
+                                            <li><strong>リアクション</strong>: スタンプを使ってお友達の投稿に反応できます。</li>
+                                            <li><strong>グループ機能</strong>: 仲良しの友達や所属ごとのグループで会話ができます。</li>
+                                        </ul>
 
-                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🚀 主な機能</h5>
+                                        <p style={{ fontWeight: "bold", margin: "15px 0 5px 0" }}>🎮 ゲーム・お楽しみ要素</p>
+                                        <ul style={{ paddingLeft: "20px" }}>
+                                            <li><strong>プロフィール＆ペット</strong>: 投稿でXPを獲得してペットを育てられます。</li>
+                                            <li><strong>にこにこクイズ</strong>: 投稿前の学習クイズ。年齢に合わせて難易度調整が可能です。</li>
+                                            <li><strong>ゲーム作成リクエスト</strong>: 自分の考えたゲームをリクエストしたり、おともだちのゲームを遊べます。自分の想いを言葉にする練習にもなります。</li>
+                                        </ul>
+
+                                        <p style={{ fontWeight: "bold", margin: "15px 0 5px 0" }}>🛡️ 安心・安全設計</p>
+                                        <ul style={{ paddingLeft: "20px" }}>
+                                            <li><strong>ひらがなモード</strong>: UIは平仮名を中心に設計されています。</li>
+                                            <li><strong>使いすぎ防止機能</strong>: おやすみモードやゲーム時間制限で健全な利用をサポートします。</li>
+                                            <li><strong>NGワードフィルター</strong>: 不適切な言葉の投稿を自動でブロックします。</li>
+                                        </ul>
+                                    </div>
+
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🛠️ システム管理者機能</h5>
                                     <ul style={{ paddingLeft: "20px" }}>
-                                        <li><strong>きもちの投稿</strong>: 20種類以上の絵文字から気分を選んで投稿。</li>
-                                        <li><strong>にこにこペット</strong>: 成長する相棒！投稿で貯まる経験値でペットが進化します。（成長は一日一回です）</li>
-                                        <li><strong>グループ/所属機能</strong>: 学校や習い事など、自分たちのコミュニティで交流。</li>
-                                        <li><strong>セーフティフィルター</strong>: 傷つける言葉を自動検知してアドバイス。</li>
-                                        <li><strong>算数クイズ連携</strong>: 投稿前の暗算で学習習慣をサポート。</li>
+                                        <li><strong>ユーザー・組織管理</strong>: 登録情報や所属・グループの一元管理。</li>
+                                        <li><strong>リクエスト対応</strong>: ゲーム作成リクエストの処理とゲームURLの自動連携。</li>
+                                        <li><strong>システム設定</strong>: NGワードの管理や開発者向けツール。</li>
                                     </ul>
 
-                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>🏁 はじめかた</h5>
-                                    <p>新規登録後のチュートリアルで、使い方を楽しくスムーズに学ぶことができます。</p>
+                                    <h5 style={{ marginTop: "20px", marginBottom: "10px" }}>⚠️ 注意点</h5>
+                                    <p style={{ fontSize: "0.85rem", color: "#666" }}>
+                                        ※ 今回のリリースはテスト版です。データのバックアップは定期的に行われています。
+                                    </p>
                                 </div>
                             </div>
                         )}
 
-                        <div style={{ marginTop: "30px", textAlign: "right" }}>
+                        <div style={{ marginTop: "30px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <button onClick={handleLogout} className="btn" style={{ color: "#d63031", background: "none", border: "1px solid #d63031", borderRadius: "8px", padding: "8px 16px", cursor: "pointer", fontWeight: "bold" }}>
+                                ログアウト
+                            </button>
                             <button onClick={onClose} style={{ color: "#888", background: "none", border: "none", textDecoration: "underline", cursor: "pointer" }}>
                                 閉じる
                             </button>
@@ -572,6 +677,6 @@ export default function ParentSettings({ isOpen, onClose }) {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

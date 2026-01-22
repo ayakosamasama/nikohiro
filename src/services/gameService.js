@@ -1,6 +1,6 @@
 import { db } from "../lib/firebase";
 import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
-import { getLevelFromXP } from "../data/gameData";
+import { getLevelFromXP, PETS } from "../data/gameData";
 
 /**
  * Grants rewards for posting.
@@ -89,9 +89,12 @@ export const grantPostRewards = async (userId, forceEgg = false, xpMultiplier = 
         // 30% chance or forced
         if (roll < 0.3 || forceEgg) {
             eggFound = true;
-            // Pick random pet ID (pet01 to pet05)
-            const randomId = Math.floor(Math.random() * 5) + 1;
-            potentialPetId = `pet0${randomId}`;
+            // Pick random pet ID based on available PETS
+            const petIds = Object.keys(PETS);
+            // petIds are like ["pet01", "pet02", ...]. We assume they are strictly 1..N or just pick from array.
+            // Safer to pick from array directly.
+            const randomId = petIds[Math.floor(Math.random() * petIds.length)];
+            potentialPetId = randomId;
         }
     }
 
@@ -123,5 +126,12 @@ export const adoptPet = async (userId, petId) => {
     await updateDoc(userRef, {
         pet: newPet,
         unlockedPetImages: arrayUnion(startImageId)
+    });
+};
+
+export const releasePet = async (userId) => {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+        pet: null
     });
 };

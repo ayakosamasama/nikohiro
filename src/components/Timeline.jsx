@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import UserProfileModal from "./UserProfileModal";
 
 const STAMPS = [
-    { id: "like", emoji: "👍", label: "いい音！" }, // Typo intentional? "Inne!" Good sound? Probably "Good job" いいね
+    { id: "like", emoji: "👍", label: "いいね！" },
     { id: "love", emoji: "❤️", label: "だいすき" },
     { id: "awesome", emoji: "🎉", label: "すごい" },
     { id: "surprised", emoji: "😲", label: "びっくり" },
@@ -18,6 +18,14 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedUserId, setSelectedUserId] = useState(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth <= 600);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         if (!user) return;
@@ -43,53 +51,89 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
     if (loading) return <p style={{ textAlign: "center", padding: "20px" }}>よみこみ中...</p>;
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-            {posts.map((post) => (
-                <div key={post.id} style={{
-                    backgroundColor: "white",
-                    padding: "20px",
-                    borderRadius: "15px",
-                    marginBottom: "15px",
-                    boxShadow: "var(--shadow-sm)",
-                    display: "flex",
-                    gap: "15px",
-                    alignItems: "flex-start"
-                }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "20px" }}>
+            {posts.map((post, idx) => (
+                <div key={post.id}
+                    className="card animate-slide"
+                    style={{
+                        animationDelay: `${idx * 0.1}s`,
+                        display: "flex",
+                        gap: isMobile ? "10px" : "18px",
+                        alignItems: "flex-start",
+                        position: "relative",
+                        overflow: "hidden",
+                        padding: isMobile ? "12px" : "20px" // Assuming 'card' class has padding, we might override it or just rely on inline if card class is simple. 
+                        // Note: 'card' usually implies padding. If it's a global class, inline padding might be needed to shrink it.
+                        // Let's assume global css defines padding. I will add padding here to override if needed, or rely on internal spacing.
+                        // Actually, looking at the code, standard 'card' class usually has padding. I'll check if I can override it via style prop if it's set in CSS. 
+                        // If 'card' isn't viewed, I'll assume I can set padding.
+                    }}>
+
+                    {/* Mood Gradient Accent */}
+                    <div style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        width: "6px",
+                        backgroundColor: "var(--primary)"
+                    }} />
 
                     <div
                         onClick={() => setSelectedUserId(post.userId)}
+                        className="btn"
                         style={{
-                            width: "50px", height: "50px", borderRadius: "50%",
-                            backgroundColor: "#eee", overflow: "hidden", flexShrink: 0,
+                            width: isMobile ? "40px" : "56px",
+                            height: isMobile ? "40px" : "56px",
+                            borderRadius: "50%",
+                            backgroundColor: "white", overflow: "hidden", flexShrink: 0,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "2rem", cursor: "pointer", border: "2px solid white",
-                            boxShadow: "0 2px 5px rgba(0,0,0,0.1)", transition: "transform 0.1s"
+                            fontSize: isMobile ? "1.5rem" : "2.2rem",
+                            padding: 0,
+                            border: "3px solid white",
+                            boxShadow: "var(--shadow-md)"
                         }}
-                        onMouseDown={e => e.currentTarget.style.transform = "scale(0.9)"}
-                        onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
                     >
                         {post.userIcon ? (
                             <img src={post.userIcon} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
-                            <span>{post.mood.emoji}</span>
+                            <span>{post.mood?.emoji || "👤"}</span>
                         )}
                     </div>
 
                     <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                            <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{post.userName || "ななし"}</span>
-                            <span style={{ fontSize: "0.8rem", color: "#888" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: isMobile ? "4px" : "8px" }}>
+                            <span style={{ fontWeight: "900", fontSize: isMobile ? "1rem" : "1.15rem", color: "var(--text-main)" }}>
+                                {post.userName || "ななし"}
+                            </span>
+                            <span style={{ fontSize: isMobile ? "0.75rem" : "0.8rem", color: "var(--text-muted)", fontWeight: "500" }}>
                                 {post.createdAt?.seconds ? new Date(post.createdAt.seconds * 1000).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : "いま"}
                             </span>
                         </div>
-                        <div style={{ marginBottom: "5px" }}>
-                            <span style={{ fontSize: "1.2rem", marginRight: "5px" }}>{post.mood?.emoji}</span>
-                            <span style={{ color: "var(--color-grey)", fontSize: "0.9rem" }}>{post.mood?.label}</span>
+
+                        <div style={{
+                            backgroundColor: "hsl(var(--primary-h), 100%, 96%)",
+                            padding: isMobile ? "2px 8px" : "4px 12px",
+                            borderRadius: "10px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            marginBottom: isMobile ? "6px" : "12px"
+                        }}>
+                            <span style={{ fontSize: isMobile ? "0.9rem" : "1rem" }}>{post.mood?.emoji}</span>
+                            <span style={{ color: "var(--primary)", fontSize: isMobile ? "0.8rem" : "0.85rem", fontWeight: "700" }}>{post.mood?.label}</span>
                         </div>
-                        <p style={{ lineHeight: "1.5", fontSize: "1rem", whiteSpace: "pre-wrap" }}>{post.text}</p>
+
+                        <p style={{
+                            lineHeight: "1.5",
+                            fontSize: isMobile ? "0.95rem" : "1.05rem",
+                            whiteSpace: "pre-wrap",
+                            color: "var(--text-main)",
+                            marginBottom: isMobile ? "8px" : "12px"
+                        }}>{post.text}</p>
 
                         {/* Stamps Section */}
-                        <div style={{ marginTop: "15px", display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: isMobile ? "4px" : "8px", flexWrap: "wrap", marginTop: isMobile ? "8px" : "16px" }}>
                             {STAMPS.map(stamp => {
                                 const reactions = post.reactions || {};
                                 const userIds = reactions[stamp.id] || [];
@@ -100,21 +144,25 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
                                     <button
                                         key={stamp.id}
                                         onClick={() => user && toggleReaction(post.id, user.uid, stamp.id)}
+                                        className="btn"
                                         style={{
-                                            background: isReacted ? "#fff0f5" : "#f8f9fa",
-                                            border: isReacted ? "2px solid #fd79a8" : "1px solid #ddd",
-                                            borderRadius: "20px",
-                                            padding: "5px 12px",
-                                            cursor: "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "5px",
-                                            transition: "all 0.1s"
+                                            background: isReacted ? "var(--color-pink)" : "white",
+                                            border: isReacted ? "2px solid var(--color-pink)" : "2px solid #f1f2f6",
+                                            borderRadius: "16px",
+                                            padding: isMobile ? "4px 8px" : "6px 12px",
+                                            fontSize: isMobile ? "1rem" : "1.2rem",
+                                            boxShadow: isReacted ? "var(--shadow-sm)" : "none",
+                                            minWidth: isMobile ? "40px" : "50px"
                                         }}
                                     >
-                                        <span style={{ fontSize: "1.2rem" }}>{stamp.emoji}</span>
+                                        <span>{stamp.emoji}</span>
                                         {count > 0 && (
-                                            <span style={{ fontSize: "0.9rem", color: isReacted ? "#e84393" : "#636e72", fontWeight: "bold" }}>
+                                            <span style={{
+                                                fontSize: "0.9rem",
+                                                color: isReacted ? "white" : "var(--text-muted)",
+                                                fontWeight: "800",
+                                                marginLeft: "4px"
+                                            }}>
                                                 {count}
                                             </span>
                                         )}

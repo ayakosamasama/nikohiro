@@ -66,13 +66,25 @@ export async function DELETE(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const uid = searchParams.get("uid");
+    const uidParam = searchParams.get("uid");
+    const emailParam = searchParams.get("email");
 
-    if (!uid) {
-        return NextResponse.json({ error: "UID required" }, { status: 400 });
+    if (!uidParam && !emailParam) {
+        return NextResponse.json({ error: "UID or Email required" }, { status: 400 });
     }
 
     try {
+        let uid = uidParam;
+
+        if (!uid && emailParam) {
+            const userRecord = await adminAuth.getUserByEmail(emailParam);
+            uid = userRecord.uid;
+        }
+
+        if (!uid) {
+            throw new Error("Could not find user UID");
+        }
+
         // Delete from Auth
         await adminAuth.deleteUser(uid);
         // Delete from Firestore
@@ -87,6 +99,19 @@ export async function DELETE(request) {
             });
             await batch.commit();
             console.log(`Deleted ${postsQuery.size} posts for user ${uid}`);
+        }
+
+        // Delete game file if exists
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const gameFilePath = path.join(process.cwd(), "public", "games", `${uid}.html`);
+            if (fs.existsSync(gameFilePath)) {
+                fs.unlinkSync(gameFilePath);
+                console.log(`Deleted game file for user ${uid}`);
+            }
+        } catch (fileErr) {
+            console.error("Failed to delete game file:", fileErr);
         }
 
         return NextResponse.json({ success: true });

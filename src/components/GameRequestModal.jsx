@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { getUserRequests, addRequest } from "../services/requestService";
+import { hasPendingRequest, addRequest } from "../services/requestService";
 import { getUserProfile, updateUserProfile } from "../services/userService";
 import { serverTimestamp } from "firebase/firestore";
 
@@ -13,20 +13,23 @@ export default function GameRequestModal({ isOpen, onClose }) {
     const [gameIdea, setGameIdea] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
+    // New states
+    const [requestType, setRequestType] = useState("new"); // 'new' or 'update'
+    const [profileData, setProfileData] = useState(null);
+
     useEffect(() => {
         const fetchStatus = async () => {
             if (user && isOpen) {
                 setLoading(true);
                 try {
-                    const [requests, profile] = await Promise.all([
-                        getUserRequests(user.uid),
+                    const [hasPending, profile] = await Promise.all([
+                        hasPendingRequest(user.uid),
                         getUserProfile(user.uid)
                     ]);
-                    // Find if there's a "ゲーム作成" request
-                    const gameReq = requests.find(r => r.title === "ゲーム作成");
-                    setPendingRequest(gameReq);
 
-                    // Check if already requested today
+                    setProfileData(profile);
+                    setPendingRequest(hasPending);
+
                     if (profile?.lastGameRequestDate) {
                         const lastDate = profile.lastGameRequestDate.toDate();
                         const now = new Date();
@@ -54,17 +57,17 @@ export default function GameRequestModal({ isOpen, onClose }) {
         try {
             await addRequest(
                 user.uid,
-                user.displayName || "ななし",
+                profileData?.displayName || user.displayName || "ななし",
                 user.email,
-                "ゲーム作成",
+                requestType === "new" ? "ゲーム作成" : "ゲーム変更", // Use selected type
                 gameIdea
             );
-            // Update last request date
+
             await updateUserProfile(user.uid, { lastGameRequestDate: serverTimestamp() });
 
             alert("リクエストをおくったよ！\nつくってもらえるまで、すこし まっててね。");
             onClose();
-            setGameIdea(""); // Reset
+            setGameIdea("");
         } catch (e) {
             console.error(e);
             alert("しっぱい しちゃった...");
@@ -114,12 +117,46 @@ export default function GameRequestModal({ isOpen, onClose }) {
                     </div>
                 ) : (
                     <>
+                        <p style={{ textAlign: "left", fontSize: "0.9rem", color: "#666", marginBottom: "15px" }}>
+                            どんな おねがいを する？
+                        </p>
+
+                        <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                            <label style={{
+                                flex: 1, padding: "10px", border: `2px solid ${requestType === "new" ? "var(--primary)" : "#ddd"}`,
+                                borderRadius: "10px", cursor: "pointer", background: requestType === "new" ? "#fff5e6" : "white",
+                                fontWeight: requestType === "new" ? "bold" : "normal"
+                            }}>
+                                <input
+                                    type="radio" name="reqType" value="new"
+                                    checked={requestType === "new"}
+                                    onChange={() => setRequestType("new")}
+                                    style={{ display: "none" }}
+                                />
+                                ✨ あたらしく<br />つくる
+                            </label>
+
+                            <label style={{
+                                flex: 1, padding: "10px", border: `2px solid ${requestType === "update" ? "var(--primary)" : "#ddd"}`,
+                                borderRadius: "10px", cursor: "pointer", background: requestType === "update" ? "#fff5e6" : "white",
+                                fontWeight: requestType === "update" ? "bold" : "normal"
+                            }}>
+                                <input
+                                    type="radio" name="reqType" value="update"
+                                    checked={requestType === "update"}
+                                    onChange={() => setRequestType("update")}
+                                    style={{ display: "none" }}
+                                />
+                                🔧 もっと<br />よくする
+                            </label>
+                        </div>
+
                         <p style={{ textAlign: "left", fontSize: "0.9rem", color: "#666" }}>
-                            きみの アイデアで、せかいに ひとつだけの ゲームを つくろう！
+                            アイデアを おしえてね！
                         </p>
                         <div style={{ marginBottom: "20px" }}>
                             <textarea
-                                placeholder="どんなゲームにしたい？（例：おはなを クリックする ゲーム！）"
+                                placeholder={requestType === "new" ? "どんなゲームにしたい？（例：おはなを クリックする ゲーム！）" : "どこを なおしてほしい？（例：もっと かんたんに してほしい！）"}
                                 value={gameIdea}
                                 onChange={(e) => setGameIdea(e.target.value)}
                                 style={{

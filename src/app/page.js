@@ -6,10 +6,13 @@ import PostForm from "../components/PostForm";
 import Timeline from "../components/Timeline";
 import GroupList from "../components/GroupList";
 import TutorialModal from "../components/TutorialModal"; // Added import
+import ReleaseNotesModal from "../components/ReleaseNotesModal";
 import { subscribeToGroups, subscribeToUserGroups } from "../services/groupService";
 import { updateUserProfile, getUserProfile } from "../services/userService";
 import PetScreen from "../components/PetScreen";
 import GameRequestModal from "../components/GameRequestModal";
+
+const APP_VERSION = "1.0.0-beta";
 
 export default function Home() {
   const { user, login, signup } = useAuth();
@@ -25,9 +28,11 @@ export default function Home() {
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups', 'pet'
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [showPets, setShowPets] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch joined groups for authenticated user
   useEffect(() => {
@@ -35,10 +40,14 @@ export default function Home() {
       const unsubUser = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
       const unsubGroups = subscribeToGroups((groups) => setAllGroups(groups));
 
-      // Check Parent Settings for Pet Visibility
+      // Check Parent Settings for Pet Visibility & Release Notes
       getUserProfile(user.uid).then(profile => {
         if (profile?.settings?.showPets !== undefined) {
           setShowPets(profile.settings.showPets);
+        }
+        // Auto show release notes if version differs AND tutorial is not running
+        if (profile?.lastViewedVersion !== APP_VERSION && !isTutorialOpen) {
+          setIsReleaseNotesOpen(true);
         }
       });
 
@@ -51,21 +60,56 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError("");
+    setIsSubmitting(true);
     try {
       if (isLogin) {
         await login(email, password);
       } else {
         const cred = await signup(email, password);
-        // Save initial profile
+
+
+        let gameUrl = null;
+        // Setup default game file
+        try {
+          const res = await fetch("/api/user/setup-game", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid: cred.user.uid })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            gameUrl = data.path;
+          }
+        } catch (fileErr) {
+          console.error("Failed to setup default game file:", fileErr);
+        }
+
+        // Save initial profile with gameUrl
         await updateUserProfile(cred.user.uid, {
           displayName: name,
-          themeColor: "orange" // default
+          themeColor: "orange", // default
+          gameUrl: gameUrl || ""
         });
+
         setIsTutorialOpen(true);
       }
     } catch (err) {
-      console.error(err);
+      // Only log unexpected errors to avoid dev overlay for common auth errors
+      const knownErrors = [
+        "auth/weak-password",
+        "auth/email-already-in-use",
+        "auth/invalid-email",
+        "auth/user-not-found",
+        "auth/wrong-password",
+        "auth/invalid-credential",
+        "auth/too-many-requests"
+      ];
+      if (!knownErrors.includes(err.code)) {
+        console.error(err);
+      }
+
       let msg = "エラーが発生しました";
       if (err.code === "auth/weak-password") msg = "パスワードは6文字以上にしてください";
       else if (err.code === "auth/email-already-in-use") msg = "そのメールアドレスはすでに登録されています";
@@ -76,6 +120,8 @@ export default function Home() {
       else if (err.code === "auth/too-many-requests") msg = "回数が多すぎます。しばらく待ってから試してください";
 
       setError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -85,7 +131,31 @@ export default function Home() {
 
     return (
       <div style={{ maxWidth: "600px", margin: "20px auto", paddingBottom: "50px" }}>
-        <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
+        <TutorialModal
+          isOpen={isTutorialOpen}
+          onClose={() => {
+            setIsTutorialOpen(false);
+            // Trigger release notes after tutorial if version mismatch
+            getUserProfile(user.uid).then(profile => {
+              if (profile?.lastViewedVersion !== APP_VERSION) {
+                setIsReleaseNotesOpen(true);
+              }
+            });
+          }}
+        />
+
+        <ReleaseNotesModal
+          isOpen={isReleaseNotesOpen}
+          onClose={async () => {
+            setIsReleaseNotesOpen(false);
+            // Save viewed version to profile
+            try {
+              await updateUserProfile(user.uid, { lastViewedVersion: APP_VERSION });
+            } catch (e) {
+              console.error("Failed to save viewed version", e);
+            }
+          }}
+        />
 
         <div style={{ textAlign: "right", marginBottom: "10px" }}>
           <button
@@ -228,6 +298,7 @@ export default function Home() {
         {/* Floating Action Button (FAB) for Game */}
         {activeTab === "home" && (
           <button
+            id="tutorial-game-fab"
             onClick={() => setIsGameModalOpen(true)}
             style={{
               position: "fixed",
@@ -286,6 +357,8 @@ export default function Home() {
             to { transform: translateY(0); opacity: 1; }
           }
         `}</style>
+
+
       </div>
     );
   }
@@ -348,8 +421,13 @@ export default function Home() {
             fontSize: "1rem"
           }}
         />
-        <button type="submit" className="btn btn-primary" style={{ fontSize: "1.2rem", marginTop: "10px" }}>
-          {isLogin ? "ログインする" : "とうろくする"}
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ fontSize: "1.2rem", marginTop: "10px", opacity: isSubmitting ? 0.7 : 1 }}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "処理中..." : (isLogin ? "ログインする" : "とうろくする")}
         </button>
       </form>
 
@@ -366,6 +444,22 @@ export default function Home() {
       >
         {isLogin ? "あたらしくはじめる" : "ログインはこちら"}
       </button>
+
+      {/* Temporary Dev Button */}
+      <div style={{ marginTop: "30px", borderTop: "1px solid #eee", paddingTop: "20px" }}>
+        <button
+          onClick={async () => {
+            // We need user auth here, but this form is for unauth.
+            // Actually, this block is for unauth user.
+            // We need to add the button to the AUTHENTICATED view.
+            alert("ログインしてから押してください");
+          }}
+          style={{ fontSize: "0.8rem", color: "#ccc", background: "none", border: "none", cursor: "pointer" }}
+        >
+          開発者オプション
+        </button>
+      </div>
     </div>
   );
 }
+

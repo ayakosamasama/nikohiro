@@ -26,7 +26,7 @@ const TUTORIAL_STEPS = [
     },
     {
         title: "3. 各種設定について",
-        content: "ここではクイズの難易度や、利用時間、パスワードの変更などができます。\nお子様の成長に合わせて調整してください。",
+        content: "ここではクイズの難易度や、機能設定（ゲームなど）、パスワードの変更などができます。\nお子様の成長に合わせて調整してください。",
         emoji: "⚙️",
         targetId: "tutorial-tab-quiz",
         action: "next"
@@ -109,6 +109,30 @@ const TUTORIAL_STEPS = [
         content: "とうこうすると、ペットが よろこぶよ！\n「ペット」タブを おして、ようすを みてみてね。",
         emoji: "🐶",
         targetId: "tutorial-pet-tab",
+        action: "next"
+    },
+    {
+        title: "14. ゲームをつくろう！",
+        content: "「🎮」ボタンから「ゲームを つくる」をえらぶと、じぶんだけのゲームを おねがい できるよ！",
+        emoji: "👾",
+        targetId: "tutorial-game-fab",
+        action: "next",
+        position: "top",
+        hidePointer: true
+    },
+    {
+        title: "15. ゲームであそぶ",
+        content: "ゲームができると、画面の上に「🎮」ボタンがでてくるよ。\nここから いつでも あそべるよ！",
+        emoji: "🕹️",
+        targetId: "app-header",
+        action: "next",
+        position: "bottom"
+    },
+    {
+        title: "16. おともだちのゲーム",
+        content: "おともだちの アイコンを おすと、その子がつくったゲームで あそべるよ！\nみんなのゲームを さがしてみてね。",
+        emoji: "🔍",
+        targetId: "tutorial-home-tab",
         action: "next"
     },
     {
@@ -252,9 +276,10 @@ export default function TutorialModal({ isOpen, onClose }) {
                         fontWeight: "bold", fontSize: "0.9rem", whiteSpace: "nowrap",
                         animation: "bounce 1s infinite",
                         boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-                        pointerEvents: "none"
+                        pointerEvents: "none",
+                        display: currentStep.hidePointer ? "none" : "block"
                     }}>
-                        {rect.top < 100 ? "👆 ここを押してね！" : "👇 ここを押してね！"}
+                        {rect.top < 100 ? "👆 ここを おしてね！" : "👇 ここを おしてね！"}
                     </div>
                 </div>
             )}
@@ -307,19 +332,29 @@ export default function TutorialModal({ isOpen, onClose }) {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <button
-                        onClick={handleBack}
-                        disabled={step === 0}
-                        style={{
-                            padding: "8px 16px", borderRadius: "8px", border: "none",
-                            background: step === 0 ? "transparent" : "#f0f0f0",
-                            color: step === 0 ? "transparent" : "#636e72",
-                            cursor: step === 0 ? "default" : "pointer",
-                            fontWeight: "600"
-                        }}
-                    >
-                        戻る
-                    </button>
+                    {step === 0 ? (
+                        <button
+                            onClick={onClose}
+                            style={{
+                                padding: "8px 16px", borderRadius: "8px", border: "none",
+                                background: "#f0f0f0", color: "#636e72",
+                                cursor: "pointer", fontWeight: "600"
+                            }}
+                        >
+                            閉じる
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleBack}
+                            style={{
+                                padding: "8px 16px", borderRadius: "8px", border: "none",
+                                background: "#f0f0f0", color: "#636e72",
+                                cursor: "pointer", fontWeight: "600"
+                            }}
+                        >
+                            戻る
+                        </button>
+                    )}
 
                     {!isActionStep && (
                         <button
