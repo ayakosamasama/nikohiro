@@ -6,7 +6,7 @@ import ProfileSettings from "./ProfileSettings";
 import ParentSettings from "./ParentSettings";
 
 export default function Header() {
-    const { user, isAdmin, logout } = useAuth();
+    const { user, profile, isAdmin, logout } = useAuth();
     const router = useRouter();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isParentSettingsOpen, setIsParentSettingsOpen] = useState(false);
@@ -79,9 +79,9 @@ export default function Header() {
                             <span style={{ fontSize: "1.2rem" }}>⚙️</span>
                         )}
                     </button>
-                    {user?.gameUrl && (
+                    {profile?.gameUrl && (
                         <button
-                            onClick={() => window.open(user.gameUrl, "_blank")}
+                            onClick={() => window.open(profile.gameUrl, "_blank")}
                             style={{
                                 background: "#9b59b6",
                                 border: "none",
