@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>海釣りチャレンジ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #e0f2fe;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            background: linear-gradient(to bottom, #87ceeb 0%, #0077be 20%, #000080 100%);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            cursor: crosshair;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .message-box {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-overlay">
+            <div class="text-2xl font-bold">スコア: <span id="score">0</span></div>
+            <div class="text-xl">のこり時間: <span id="timer">60</span>s</div>
+        </div>
+
+        <!-- スタート画面 -->
+        <div id="start-screen" class="message-box">
+            <h1 class="text-4xl font-bold text-blue-600">海釣りチャレンジ</h1>
+            <p class="text-gray-600">マウスかタップで釣り針を動かそう！<br>クリック・長押しで針を深く沈めるよ。</p>
+            <div class="flex flex-wrap justify-center gap-4 text-sm mt-2">
+                <span>🐟 +10</span>
+                <span>🐠 +30</span>
+                <span>🐡 +50</span>
+                <span>🥫 -20</span>
+            </div>
+            <button id="start-btn"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full transition-all transform hover:scale-105">
+                ゲーム開始
+            </button>
+        </div>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="game-over-screen" class="message-box hidden">
+            <h2 class="text-4xl font-bold text-blue-800">タイムアップ！</h2>
+            <p class="text-2xl text-gray-700">最終スコア: <span id="final-score">0</span></p>
+            <button id="restart-btn"
+                class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full transition-all transform hover:scale-105">
+                もう一度遊ぶ
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreElement = document.getElementById('final-score');
+
+        let score = 0;
+        let timeLeft = 60;
+        let gameActive = false;
+        let animationId;
+        let fishes = [];
+        let items = [];
+        let particles = [];
+
+        // プレイヤー（釣り針）の状態
+        const hook = {
+            x: 0,
+            y: 100,
+            targetX: 0,
+            depth: 0,
+            isSinking: false,
+            maxDepth: 0,
+            width: 30,
+            height: 40
+        };
+
+        // 魚の種類データ
+        const fishTypes = [
+            { emoji: '🐟', points: 10, speed: 2, size: 30, chance: 0.6 },
+            { emoji: '🐠', points: 30, speed: 3, size: 35, chance: 0.25 },
+            { emoji: '🐡', points: 50, speed: 4, size: 40, chance: 0.1 },
+            { emoji: '🦑', points: 100, speed: 6, size: 45, chance: 0.05 }
+        ];
+
+        const trashTypes = [
+            { emoji: '🥫', points: -20, speed: 1.5, size: 30 },
+            { emoji: '👞', points: -30, speed: 1.2, size: 35 }
+        ];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            hook.maxDepth = canvas.height - 100;
+            hook.x = canvas.width / 2;
+            hook.targetX = hook.x;
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // 入力制御
+        window.addEventListener('mousemove', (e) => {
+            hook.targetX = e.clientX;
+        });
+
+        window.addEventListener('mousedown', () => { hook.isSinking = true; });
+        window.addEventListener('mouseup', () => { hook.isSinking = false; });
+
+        window.addEventListener('touchstart', (e) => {
+            hook.isSinking = true;
+            hook.targetX = e.touches[0].clientX;
+        });
+        window.addEventListener('touchmove', (e) => {
+            hook.targetX = e.touches[0].clientX;
+        });
+        window.addEventListener('touchend', () => { hook.isSinking = false; });
+
+        class GameObject {
+            constructor(isTrash = false) {
+                const typeList = isTrash ? trashTypes : fishTypes;
+                let type;
+
+                if (isTrash) {
+                    type = typeList[Math.floor(Math.random() * typeList.length)];
+                } else {
+                    const rand = Math.random();
+                    let cumulative = 0;
+                    for (let t of fishTypes) {
+                        cumulative += t.chance;
+                        if (rand < cumulative) {
+                            type = t;
+                            break;
+                        }
+                    }
+                    if (!type) type = fishTypes[0];
+                }
+
+                this.emoji = type.emoji;
+                this.points = type.points;
+                this.speed = type.speed * (Math.random() * 0.5 + 0.75);
+                this.size = type.size;
+                this.y = 200 + Math.random() * (canvas.height - 300);
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.x = this.direction === 1 ? -50 : canvas.width + 50;
+                this.caught = false;
+            }
+
+            update() {
+                if (this.caught) return;
+                this.x += this.speed * this.direction;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.font = `${this.size}px serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // 進行方向に向ける
+                if (this.direction === -1) {
+                    ctx.translate(this.x, this.y);
+                    ctx.scale(-1, 1);
+                    ctx.fillText(this.emoji, 0, 0);
+                } else {
+                    ctx.fillText(this.emoji, this.x, this.y);
+                }
+                ctx.restore();
+            }
+
+            isOffscreen() {
+                return this.direction === 1 ? this.x > canvas.width + 100 : this.x < -100;
+            }
+        }
+
+        function createParticle(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color
+                });
+            }
+        }
+
+        function spawnObjects() {
+            if (Math.random() < 0.03 && fishes.length < 15) {
+                fishes.push(new GameObject(false));
+            }
+            if (Math.random() < 0.01 && items.length < 5) {
+                items.push(new GameObject(true));
+            }
+        }
+
+        function updateGame() {
+            if (!gameActive) return;
+
+            // 釣り針の移動
+            hook.x += (hook.targetX - hook.x) * 0.1;
+
+            if (hook.isSinking) {
+                hook.y = Math.min(hook.y + 10, hook.maxDepth);
+            } else {
+                hook.y = Math.max(hook.y - 15, 100);
+            }
+
+            // 魚の更新
+            [...fishes, ...items].forEach((obj, index, array) => {
+                obj.update();
+
+                // 当たり判定
+                const dx = obj.x - hook.x;
+                const dy = obj.y - (hook.y + hook.height);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 30 && !obj.caught) {
+                    obj.caught = true;
+                    score += obj.points;
+                    scoreElement.innerText = score;
+                    createParticle(obj.x, obj.y, obj.points > 0 ? '#fbbf24' : '#ef4444');
+
+                    // 配列から削除
+                    if (fishes.includes(obj)) {
+                        fishes.splice(fishes.indexOf(obj), 1);
+                    } else {
+                        items.splice(items.indexOf(obj), 1);
+                    }
+                }
+            });
+
+            fishes = fishes.filter(f => !f.isOffscreen());
+            items = items.filter(i => !i.isOffscreen());
+
+            // パーティクルの更新
+            particles.forEach((p, i) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+            });
+            particles = particles.filter(p => p.life > 0);
+
+            spawnObjects();
+            draw();
+            animationId = requestAnimationFrame(updateGame);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 海面の線
+            ctx.beginPath();
+            ctx.moveTo(0, 100);
+            ctx.lineTo(canvas.width, 100);
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 釣り糸
+            ctx.beginPath();
+            ctx.moveTo(hook.x, 0);
+            ctx.lineTo(hook.x, hook.y);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 釣り針
+            ctx.save();
+            ctx.translate(hook.x, hook.y);
+            ctx.font = '40px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚓', 0, 30);
+            ctx.restore();
+
+            // オブジェクト
+            fishes.forEach(f => f.draw());
+            items.forEach(i => i.draw());
+
+            // パーティクル
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function startGame() {
+            score = 0;
+            timeLeft = 60;
+            fishes = [];
+            items = [];
+            particles = [];
+            scoreElement.innerText = score;
+            timerElement.innerText = timeLeft;
+            gameActive = true;
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+
+            timerId = setInterval(() => {
+                timeLeft--;
+                timerElement.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            updateGame();
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerId);
+            cancelAnimationFrame(animationId);
+            finalScoreElement.innerText = score;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+
+        // 初期描画
+        draw();
+    </script>
+</body>
+
+</html>

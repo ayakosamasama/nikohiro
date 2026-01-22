@@ -48,7 +48,7 @@ export const deleteRequest = async (requestId) => {
 // Get requests for a specific user
 export const getUserRequests = async (userId) => {
     try {
-        const q = query(collection(db, "requests"), where("userId", "==", userId), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "requests"), where("userId", "==", userId));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({
             id: doc.id,

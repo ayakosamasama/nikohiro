@@ -2,22 +2,42 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getUserRequests, addRequest } from "../services/requestService";
+import { getUserProfile, updateUserProfile } from "../services/userService";
+import { serverTimestamp } from "firebase/firestore";
 
 export default function GameRequestModal({ isOpen, onClose }) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [pendingRequest, setPendingRequest] = useState(null);
+    const [requestedToday, setRequestedToday] = useState(false);
     const [gameIdea, setGameIdea] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchStatus = async () => {
             if (user && isOpen) {
+                setLoading(true);
                 try {
-                    const requests = await getUserRequests(user.uid);
+                    const [requests, profile] = await Promise.all([
+                        getUserRequests(user.uid),
+                        getUserProfile(user.uid)
+                    ]);
                     // Find if there's a "ゲーム作成" request
                     const gameReq = requests.find(r => r.title === "ゲーム作成");
                     setPendingRequest(gameReq);
+
+                    // Check if already requested today
+                    if (profile?.lastGameRequestDate) {
+                        const lastDate = profile.lastGameRequestDate.toDate();
+                        const now = new Date();
+                        const isSameDay =
+                            lastDate.getFullYear() === now.getFullYear() &&
+                            lastDate.getMonth() === now.getMonth() &&
+                            lastDate.getDate() === now.getDate();
+                        setRequestedToday(isSameDay);
+                    } else {
+                        setRequestedToday(false);
+                    }
                 } catch (e) {
                     console.error(e);
                 } finally {
@@ -29,7 +49,7 @@ export default function GameRequestModal({ isOpen, onClose }) {
     }, [user, isOpen]);
 
     const handleSubmit = async () => {
-        if (!gameIdea.trim()) return;
+        if (!gameIdea.trim() || submitting || pendingRequest || requestedToday) return;
         setSubmitting(true);
         try {
             await addRequest(
@@ -39,8 +59,12 @@ export default function GameRequestModal({ isOpen, onClose }) {
                 "ゲーム作成",
                 gameIdea
             );
+            // Update last request date
+            await updateUserProfile(user.uid, { lastGameRequestDate: serverTimestamp() });
+
             alert("リクエストをおくったよ！\nつくってもらえるまで、すこし まっててね。");
             onClose();
+            setGameIdea(""); // Reset
         } catch (e) {
             console.error(e);
             alert("しっぱい しちゃった...");
@@ -67,11 +91,17 @@ export default function GameRequestModal({ isOpen, onClose }) {
 
                 {loading ? (
                     <p>読み込み中...</p>
-                ) : pendingRequest ? (
+                ) : (pendingRequest || requestedToday) ? (
                     <div style={{ padding: "20px" }}>
                         <div style={{ fontSize: "4rem", marginBottom: "20px" }}>✨</div>
-                        <h3 style={{ color: "#e67e22" }}>さくせいちゅう</h3>
-                        <p>いま、きみのゲームを つくっているよ！<br />かんせいするまで、たのしみに まっててね！</p>
+                        <h3 style={{ color: "#e67e22" }}>
+                            {pendingRequest ? "さくせいちゅう" : "また こんど！"}
+                        </h3>
+                        <p>
+                            {pendingRequest
+                                ? "いま、きみのゲームを つくっているよ！\nかんせいするまで、たのしみに まっててね！"
+                                : "きょうは もう リクエストしたよ！\nあした また おねがいしてね！"}
+                        </p>
                         <button
                             onClick={onClose}
                             style={{
