@@ -1,0 +1,126 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { getUserRequests, addRequest } from "../services/requestService";
+
+export default function GameRequestModal({ isOpen, onClose }) {
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [pendingRequest, setPendingRequest] = useState(null);
+    const [gameIdea, setGameIdea] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        const fetchStatus = async () => {
+            if (user && isOpen) {
+                try {
+                    const requests = await getUserRequests(user.uid);
+                    // Find if there's a "ゲーム作成" request
+                    const gameReq = requests.find(r => r.title === "ゲーム作成");
+                    setPendingRequest(gameReq);
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+        fetchStatus();
+    }, [user, isOpen]);
+
+    const handleSubmit = async () => {
+        if (!gameIdea.trim()) return;
+        setSubmitting(true);
+        try {
+            await addRequest(
+                user.uid,
+                user.displayName || "ななし",
+                user.email,
+                "ゲーム作成",
+                gameIdea
+            );
+            alert("リクエストをおくったよ！\nつくってもらえるまで、すこし まっててね。");
+            onClose();
+        } catch (e) {
+            console.error(e);
+            alert("しっぱい しちゃった...");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)", zIndex: 2000,
+            display: "flex", alignItems: "center", justifyContent: "center"
+        }} onClick={onClose}>
+            <div style={{
+                background: "white", borderRadius: "25px", padding: "30px",
+                width: "90%", maxWidth: "450px", textAlign: "center",
+                boxShadow: "0 10px 40px rgba(0,0,0,0.3)"
+            }} onClick={e => e.stopPropagation()}>
+
+                <h2 style={{ color: "var(--primary)", marginBottom: "20px" }}>🎮 ゲームづくり</h2>
+
+                {loading ? (
+                    <p>読み込み中...</p>
+                ) : pendingRequest ? (
+                    <div style={{ padding: "20px" }}>
+                        <div style={{ fontSize: "4rem", marginBottom: "20px" }}>✨</div>
+                        <h3 style={{ color: "#e67e22" }}>さくせいちゅう</h3>
+                        <p>いま、きみのゲームを つくっているよ！<br />かんせいするまで、たのしみに まっててね！</p>
+                        <button
+                            onClick={onClose}
+                            style={{
+                                marginTop: "20px", background: "#eee", border: "none",
+                                padding: "10px 30px", borderRadius: "20px", fontWeight: "bold", cursor: "pointer"
+                            }}
+                        >
+                            とじる
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <p style={{ textAlign: "left", fontSize: "0.9rem", color: "#666" }}>
+                            きみの アイデアで、せかいに ひとつだけの ゲームを つくろう！
+                        </p>
+                        <div style={{ marginBottom: "20px" }}>
+                            <textarea
+                                placeholder="どんなゲームにしたい？（例：おはなを クリックする ゲーム！）"
+                                value={gameIdea}
+                                onChange={(e) => setGameIdea(e.target.value)}
+                                style={{
+                                    width: "100%", height: "120px", padding: "15px",
+                                    borderRadius: "15px", border: "2px solid #ddd", fontSize: "1rem",
+                                    fontFamily: "inherit"
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                            <button
+                                onClick={onClose}
+                                style={{ flex: 1, padding: "12px", borderRadius: "12px", border: "none", backgroundColor: "#eee", fontWeight: "bold", cursor: "pointer" }}
+                            >
+                                やめる
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting || !gameIdea.trim()}
+                                style={{
+                                    flex: 2, padding: "12px", borderRadius: "12px", border: "none",
+                                    backgroundColor: "var(--primary)", color: "white", fontWeight: "bold",
+                                    cursor: "pointer", opacity: (submitting || !gameIdea.trim()) ? 0.7 : 1
+                                }}
+                            >
+                                {submitting ? "おくっています..." : "おねがいする！"}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}

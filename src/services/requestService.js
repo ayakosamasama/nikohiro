@@ -1,5 +1,5 @@
 import { db } from "../lib/firebase";
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy, where } from "firebase/firestore";
 
 // Add a new request
 export const addRequest = async (userId, userName, email, title, content) => {
@@ -42,6 +42,20 @@ export const deleteRequest = async (requestId) => {
         return true;
     } catch (error) {
         console.error("Error deleting request: ", error);
+        throw error;
+    }
+};
+// Get requests for a specific user
+export const getUserRequests = async (userId) => {
+    try {
+        const q = query(collection(db, "requests"), where("userId", "==", userId), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Error getting user requests: ", error);
         throw error;
     }
 };

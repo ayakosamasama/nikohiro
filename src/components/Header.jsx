@@ -79,6 +79,26 @@ export default function Header() {
                             <span style={{ fontSize: "1.2rem" }}>⚙️</span>
                         )}
                     </button>
+                    {user?.gameUrl && (
+                        <button
+                            onClick={() => window.open(user.gameUrl, "_blank")}
+                            style={{
+                                background: "#9b59b6",
+                                border: "none",
+                                color: "white",
+                                padding: "5px 15px",
+                                borderRadius: "15px",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                                fontWeight: "bold",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px"
+                            }}
+                        >
+                            <span>🎮</span> じぶんのゲーム
+                        </button>
+                    )}
                     <button
                         onClick={logout}
                         style={{

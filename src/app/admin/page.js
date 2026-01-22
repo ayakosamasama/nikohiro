@@ -425,6 +425,19 @@ export default function AdminPage() {
     };
 
 
+    const handleSetGameUrl = async (userId, currentUrl) => {
+        const newUrl = prompt("ゲームのURLを入力してください（停止する場合は空欄）:", currentUrl || "");
+        if (newUrl === null) return;
+        try {
+            await updateUserProfile(userId, { gameUrl: newUrl });
+            alert("ゲームURLを更新しました");
+            fetchUsers();
+        } catch (e) {
+            console.error(e);
+            alert("更新に失敗しました");
+        }
+    };
+
     if (loading || loadingData) return <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>読み込み中...</div>;
     if (!user?.isAdmin) return <div style={{ padding: "50px", textAlign: "center" }}>アクセス権限がありません</div>;
 
@@ -511,6 +524,7 @@ export default function AdminPage() {
                                             </select>
                                         </TableCell>
                                         <td style={{ padding: "12px 15px", borderBottom: "1px solid #f5f5f5", display: "flex", gap: "8px" }}>
+                                            <ActionButton onClick={() => handleSetGameUrl(u.id, u.gameUrl)} color="#9b59b6" label="🎮" />
                                             <ActionButton onClick={() => handleEdit(u.id, u.email)} color="#f0ad4e" label="編集" />
                                             <ActionButton onClick={() => handleDelete(u.id)} color="#ff7675" label="削除" />
                                         </td>
@@ -645,7 +659,12 @@ export default function AdminPage() {
                                 }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px" }}>
                                         <div>
-                                            <h4 style={{ margin: "0 0 8px 0", color: "#2d3436", fontSize: "1.1rem" }}>{req.title}</h4>
+                                            <h4 style={{ margin: "0 0 8px 0", color: "#2d3436", fontSize: "1.1rem" }}>
+                                                {req.title}
+                                                {req.title === "ゲーム作成" && (
+                                                    <span style={{ marginLeft: "10px", padding: "2px 8px", background: "#9b59b6", color: "white", borderRadius: "10px", fontSize: "0.7rem", fontWeight: "bold" }}>GAME</span>
+                                                )}
+                                            </h4>
                                             <div style={{ fontSize: "0.85rem", color: "#636e72", lineHeight: "1.5" }}>
                                                 <span style={{ display: "inline-block", marginRight: "10px" }}>👤 <strong>{req.userName}</strong></span>
                                                 <span style={{ display: "inline-block", marginRight: "10px" }}>📧 {req.email}</span>

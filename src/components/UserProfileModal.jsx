@@ -103,6 +103,30 @@ export default function UserProfileModal({ userId, onClose }) {
                             </div>
                         )}
 
+                        {profile.gameUrl && (
+                            <button
+                                onClick={() => window.open(profile.gameUrl, "_blank")}
+                                style={{
+                                    width: "100%",
+                                    padding: "12px",
+                                    borderRadius: "15px",
+                                    border: "none",
+                                    backgroundColor: "#9b59b6",
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    cursor: "pointer",
+                                    marginBottom: "15px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "8px",
+                                    boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
+                                }}
+                            >
+                                <span>🎮</span> {profile.displayName || "このひと"} のゲームであそぶ
+                            </button>
+                        )}
+
                         {/* Optional: Add user group info if we want */}
 
                     </>

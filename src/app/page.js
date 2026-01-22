@@ -9,6 +9,7 @@ import TutorialModal from "../components/TutorialModal"; // Added import
 import { subscribeToGroups, subscribeToUserGroups } from "../services/groupService";
 import { updateUserProfile, getUserProfile } from "../services/userService";
 import PetScreen from "../components/PetScreen";
+import GameRequestModal from "../components/GameRequestModal";
 
 export default function Home() {
   const { user, login, signup } = useAuth();
@@ -25,6 +26,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups', 'pet'
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [showPets, setShowPets] = useState(true);
 
   // Fetch joined groups for authenticated user
@@ -223,6 +225,37 @@ export default function Home() {
           </button>
         )}
 
+        {/* Floating Action Button (FAB) for Game */}
+        {activeTab === "home" && (
+          <button
+            onClick={() => setIsGameModalOpen(true)}
+            style={{
+              position: "fixed",
+              bottom: "30px",
+              right: "110px", // Pushed further left
+              width: "65px",
+              height: "65px",
+              borderRadius: "50%",
+              background: "#9b59b6", // Purple for game
+              color: "white",
+              border: "none",
+              boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "2rem",
+              cursor: "pointer",
+              zIndex: 100,
+              transition: "transform 0.2s"
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
+            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+            title="ゲームをつくって！"
+          >
+            🎮
+          </button>
+        )}
+
         {/* Post Modal Overlay */}
         {isPostModalOpen && (
           <div style={{
@@ -241,6 +274,11 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        <GameRequestModal
+          isOpen={isGameModalOpen}
+          onClose={() => setIsGameModalOpen(false)}
+        />
 
         <style jsx global>{`
           @keyframes modalIn {
