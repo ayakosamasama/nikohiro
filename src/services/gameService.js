@@ -60,7 +60,7 @@ export const grantPostRewards = async (userId, forceEgg = false, xpMultiplier = 
             // Hard cap at 70
             if (newLevel > 70) newLevel = 70;
 
-            levelUp = newLevel > currentLevel;
+            levelUp = (petXPGained > 0) && (newLevel > currentLevel);
 
             updates["pet.xp"] = newXP;
             updates["pet.level"] = newLevel;
@@ -112,7 +112,7 @@ export const adoptPet = async (userId, petId) => {
     // Initial pet state
     const newPet = {
         type: petId,
-        level: 0,
+        level: 1,
         xp: 0,
         startDate: serverTimestamp() // Track when adopted
     };

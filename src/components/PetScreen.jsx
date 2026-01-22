@@ -37,13 +37,14 @@ export default function PetScreen() {
         setTimeout(() => setAnimation(""), 500); // Reset animation class
     };
 
-    if (loading) return <div style={{ textAlign: "center", padding: "50px" }}>読み込み中...</div>;
+    if (loading) return <div style={{ textAlign: "center", padding: "50px" }}>よみこみちゅう...</div>;
 
     if (!pet) {
         return (
             <div style={{ textAlign: "center", padding: "50px", color: "#666" }}>
                 <div style={{ fontSize: "5rem", marginBottom: "20px" }}>🥚</div>
-                <p>まだペットがいません。<br />たくさん投稿してタマゴをみつけよう！</p>
+                <p>まだ ペットが いません。<br />たくさん おはなしして タマゴを みつけよう！</p>
+                <p style={{ fontSize: "0.9rem", color: "#888" }}>（※ペットは 1にちに 1かいだけ おおきくなるよ！）</p>
             </div>
         );
     }
