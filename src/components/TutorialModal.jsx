@@ -19,72 +19,51 @@ const TUTORIAL_STEPS = [
     },
     {
         title: "1. プロフィール設定",
-        content: "まずは、じぶんだけの アイコンや いろを きめよう！\n「⚙️（歯車）」ボタンを おしてみてね。",
+        content: "「⚙️（歯車）」ボタンから、じぶんだけの アイコンや いろを きめられるよ！",
         emoji: "🎨",
         targetId: "tutorial-settings-btn",
-        action: "click",
-        position: "bottom"
+        action: "next",
+        position: "bottom",
+        hidePointer: true
     },
     {
-        title: "2. アイコンをえらぶ",
-        content: "すきな アイコンを えらんで、「OK」ボタンを おしてね。",
-        emoji: "🖼️",
-        targetId: "tutorial-settings-save-btn",
-        action: "click"
-    },
-    {
-        title: "3. グループをさがそう",
+        title: "2. グループをさがそう",
         content: "「さがす」ボタンを おして、みんなが いる グループに はいってみよう！",
         emoji: "🔍",
         targetId: "tutorial-groups-tab",
         action: "click"
     },
     {
-        title: "4. ひろばに もどろう",
+        title: "3. ひろばに もどろう",
         content: "「ひろば」ボタンを おして、みんなの いる ばしょに もどろう！",
         emoji: "🏠",
         targetId: "tutorial-home-tab",
         action: "click"
     },
     {
-        title: "5. きもちを かいてみよう",
-        content: "「えんぴつ」ボタンで、いまの きもちを とうこう してみよう。\nスタンプも おせるよ！",
+        title: "4. とうこう ボタン",
+        content: "この「えんぴつ」ボタンから、いつでも きもちを とうこう できるよ！",
         emoji: "✏️",
         targetId: "tutorial-post-fab",
-        action: "click"
-    },
-    {
-        title: "6. きもちを えらぼう",
-        content: "まずは、いまの きぶんを えらんでね。\nそのあと、メッセージを かけるよ！",
-        emoji: "🤔",
-        targetId: "tutorial-mood-area",
         action: "next",
-        position: "bottom"
+        hidePointer: true
     },
     {
-        title: "7. とうこうする",
-        content: "きもちを かいたら、「とうこうする」ボタンを おしてね。",
-        emoji: "✉️",
-        targetId: "tutorial-post-submit",
-        action: "click",
-        position: "top"
-    },
-    {
-        title: "8. ペットと あそぼう",
+        title: "5. ペットと あそぼう",
         content: "とうこうすると、ペットが よろこぶよ！\n「ペット」タブを おして、ようすを みてみてね。",
         emoji: "🐶",
         targetId: "tutorial-pet-tab",
         action: "next"
     },
     {
-        title: "9. ひろばに もどろう",
+        title: "6. ひろばに もどろう",
         content: "「ひろば」ボタンを おして、ニコニコひろばに もどろう！",
         emoji: "🏠",
         targetId: "tutorial-home-tab",
         action: "click"
     },
     {
-        title: "10. ゲームをつくろう！",
+        title: "7. ゲームをつくろう！",
         content: "「🎮」ボタンから「ゲームを つくる」をえらぶと、じぶんだけのゲームを おねがい できるよ！",
         emoji: "👾",
         targetId: "tutorial-game-fab",
@@ -93,15 +72,16 @@ const TUTORIAL_STEPS = [
         hidePointer: true
     },
     {
-        title: "11. ゲームであそぶ",
+        title: "8. ゲームであそぶ",
         content: "画面の上の「🎮」ボタンを おすと、いつでも じぶんのゲームで あそべるよ！",
         emoji: "🕹️",
         targetId: "app-header",
         action: "next",
-        position: "bottom"
+        position: "bottom",
+        hidePointer: true
     },
     {
-        title: "12. おともだちのゲーム",
+        title: "9. おともだちのゲーム",
         content: "おともだちの アイコンを おすと、その子がつくったゲームで あそべるよ！\nみんなのゲームを さがしてみてね。",
         emoji: "🔍",
         targetId: null,

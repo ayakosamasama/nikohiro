@@ -332,7 +332,8 @@ export default function Home() {
                         border: selectedGroupId === group.id ? "none" : `1px solid ${group.color}44`,
                         fontSize: "1.1rem",
                         boxShadow: selectedGroupId === group.id ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
-                        minWidth: "36px"
+                        minWidth: "36px",
+                        display: "flex", justifyContent: "center", alignItems: "center"
                       }}
                       title={group.name}
                     >

@@ -190,7 +190,14 @@ export default function Timeline({ filterMode = "all", userGroups = [], selected
                             )}
 
                             {/* Stamps Section */}
-                            <div style={{ display: "flex", gap: isMobile ? "4px" : "8px", flexWrap: "wrap", marginTop: isMobile ? "8px" : "16px" }}>
+                            <div className="hide-scrollbar" style={{
+                                display: "flex",
+                                gap: isMobile ? "4px" : "8px",
+                                flexWrap: "nowrap", // Prevent wrapping
+                                overflowX: "auto", // Enable horizontal scroll
+                                marginTop: isMobile ? "8px" : "16px",
+                                paddingBottom: "4px" // Space for scrollbar if visible (though hidden by class)
+                            }}>
                                 {STAMPS.map(stamp => {
                                     const reactions = post.reactions || {};
                                     const userIds = reactions[stamp.id] || [];

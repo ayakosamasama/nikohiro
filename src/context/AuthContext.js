@@ -13,6 +13,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [profile, setProfile] = useState(null); // Add profile state
     const [loading, setLoading] = useState(true);
     const [isMaintenance, setIsMaintenance] = useState(false);
     const [groupIds, setGroupIds] = useState([]);
@@ -71,19 +72,24 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
-            setUser(u);
             if (u) {
-                const profile = await getUserProfile(u.uid);
-                if (profile?.themeColor) {
-                    const colorVar = `var(--color-${profile.themeColor})`;
+                const fetchedProfile = await getUserProfile(u.uid);
+                if (fetchedProfile?.themeColor) {
+                    const colorVar = `var(--color-${fetchedProfile.themeColor})`;
                     document.documentElement.style.setProperty("--primary", colorVar);
                 }
-                // Sync important properties to user object
-                u.isAdmin = !!profile?.isAdmin;
-                u.affiliationId = profile?.affiliationId;
-                u.affiliations = profile?.affiliations || (profile?.affiliationId ? [profile.affiliationId] : []);
+
+                // Sync important properties to user object for compat
+                u.isAdmin = !!fetchedProfile?.isAdmin;
+                u.affiliationId = fetchedProfile?.affiliationId;
+                u.affiliations = fetchedProfile?.affiliations || (fetchedProfile?.affiliationId ? [fetchedProfile.affiliationId] : []);
+
+                setProfile(fetchedProfile);
+                setUser(u);
             } else {
                 document.documentElement.style.setProperty("--primary", "var(--color-orange)");
+                setProfile(null);
+                setUser(null);
             }
             setLoading(false);
         });
@@ -94,8 +100,8 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         const cred = await signInWithEmailAndPassword(auth, email, password);
         // Secondary check: if maintenance is on and newly logged in user is NOT admin
-        const profile = await getUserProfile(cred.user.uid);
-        if (isMaintenance && !profile?.isAdmin) {
+        const fetchedProfile = await getUserProfile(cred.user.uid);
+        if (isMaintenance && !fetchedProfile?.isAdmin) {
             await signOut(auth);
             throw new Error("現在メンテナンス中のため、管理ユーザー以外はログインできません。");
         }
@@ -116,20 +122,29 @@ export const AuthProvider = ({ children }) => {
     // refreshProfile now re-fetches the profile
     const refreshProfile = async () => {
         if (user) {
-            const profile = await getUserProfile(user.uid);
-            if (profile?.themeColor) {
-                const colorVar = `var(--color-${profile.themeColor})`;
+            const fetchedProfile = await getUserProfile(user.uid);
+            if (fetchedProfile?.themeColor) {
+                const colorVar = `var(--color-${fetchedProfile.themeColor})`;
                 document.documentElement.style.setProperty("--primary", colorVar);
             }
-            user.isAdmin = !!profile?.isAdmin;
-            user.affiliationId = profile?.affiliationId;
-            user.affiliations = profile?.affiliations || (profile?.affiliationId ? [profile.affiliationId] : []);
+            user.isAdmin = !!fetchedProfile?.isAdmin;
+            user.affiliationId = fetchedProfile?.affiliationId;
+            user.affiliations = fetchedProfile?.affiliations || (fetchedProfile?.affiliationId ? [fetchedProfile.affiliationId] : []);
+
+            // Sync display props for immediate UI update
+            if (fetchedProfile.photoURL) user.photoURL = fetchedProfile.photoURL;
+            if (fetchedProfile.displayName) user.displayName = fetchedProfile.displayName;
+
+            setProfile(fetchedProfile);
+            // Force user update to trigger shallow effects if needed, though properties are mutated
+            setUser({ ...user });
         }
     };
 
     return (
         <AuthContext.Provider value={{
             user,
+            profile, // Expose profile
             isAdmin: user?.isAdmin || false,
             affiliationId: user?.affiliationId || null,
             affiliations: user?.affiliations || [],
