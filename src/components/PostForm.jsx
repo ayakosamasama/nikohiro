@@ -57,19 +57,41 @@ const MOODS = [
 ];
 
 import { subscribeToNgWords } from "../services/adminService";
+import { getUserProfile } from "../services/userService";
 import { grantPostRewards } from "../services/gameService";
 import RewardModal from "./RewardModal";
 // ... imports
 
+import QuizModal from "./QuizModal";
+
 export default function PostForm({ userGroups = [], onClose, onSuccess, isTutorialMode = false }) {
-    const { user } = useAuth();
+    const { user, profile, affiliations, affiliationId } = useAuth();
     const [text, setText] = useState("");
     const [selectedMood, setSelectedMood] = useState(MOODS[0]);
     const [isQuizOpen, setIsQuizOpen] = useState(false);
-    const [quizAnswer, setQuizAnswer] = useState("");
-    const [currentQuiz, setCurrentQuiz] = useState({ q: "", a: 0 });
     const [name, setName] = useState("");
     const [quizSettings, setQuizSettings] = useState({ maxAnswer: 2, operations: ["add"] });
+
+    // Initial state sync from centralized profile
+    // Fetch profile data on mount since it's not in AuthContext anymore
+    useEffect(() => {
+        if (user) {
+            getUserProfile(user.uid).then(p => {
+                if (p) {
+                    const newName = p.displayName || (user.email ? user.email.split("@")[0] : "") || "ゲスト";
+                    setName(newName);
+                    if (p.quizSettings) {
+                        setQuizSettings(p.quizSettings);
+                    }
+                    if (p.settings && p.settings.mediaUploadEnabled !== undefined) {
+                        setMediaUploadEnabled(p.settings.mediaUploadEnabled);
+                    }
+                } else {
+                    setName(user.email ? user.email.split("@")[0] : "ゲスト");
+                }
+            }).catch(console.error);
+        }
+    }, [user]);
 
     // Reward State
     const [rewardData, setRewardData] = useState(null);
@@ -78,41 +100,94 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
     // NG Words state
     const [ngWords, setNgWords] = useState([]);
 
+    // Media State
+    const [mediaUploadEnabled, setMediaUploadEnabled] = useState(true);
+    const [file, setFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+
+    // Affiliation State
+    const [selectedAffiliation, setSelectedAffiliation] = useState("default");
+    const [affiliationOptions, setAffiliationOptions] = useState([]);
+
     useEffect(() => {
-        if (user) {
-            const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
-                if (doc.exists()) {
-                    const profile = doc.data();
-
-                    const newName = profile.displayName || (user.email ? user.email.split("@")[0] : "ゲスト");
-                    setName(newName);
-
-                    if (profile.quizSettings) {
-                        setQuizSettings(profile.quizSettings);
-                    }
-                } else {
-                    setName(user.email ? user.email.split("@")[0] : "ゲスト");
-                }
-            });
-            return () => unsubscribe();
+        const currentAffiliations = affiliations || [];
+        if (user && currentAffiliations.length > 0) {
+            // If only one, just set it
+            if (currentAffiliations.length === 1) {
+                setSelectedAffiliation(currentAffiliations[0]);
+            } else {
+                // Fetch names
+                import("../services/affiliationService").then(({ getAffiliations }) => {
+                    getAffiliations().then(all => {
+                        const myAffs = all.filter(a => currentAffiliations.includes(a.id));
+                        setAffiliationOptions(myAffs);
+                        if (!selectedAffiliation || selectedAffiliation === "default") {
+                            setSelectedAffiliation(affiliationId || currentAffiliations[0]);
+                        }
+                    }).catch(e => {
+                        console.error("PostForm: Fetch affiliations failed", e);
+                    });
+                });
+            }
         }
-    }, [user]);
+    }, [user, affiliations, affiliationId, selectedAffiliation]);
+    // Unified profile sync moved to AuthContext and local initialization useEffect
 
     useEffect(() => {
         const unsub = subscribeToNgWords(setNgWords);
         return () => unsub();
     }, []);
 
+    const handleFileSelect = (e) => {
+        const selected = e.target.files[0];
+        if (!selected) return;
+
+        // Image Only check
+        if (!selected.type.startsWith('image/')) {
+            alert("画像ファイル（しゃしん）だけえらんでね");
+            return;
+        }
+
+        // File Size Limit (500KB for Firestore Base64)
+        const MAX_SIZE_KB = 500;
+        if (selected.size > MAX_SIZE_KB * 1024) {
+            alert(`ファイルがおおきすぎます（${MAX_SIZE_KB}KBまで）。\nもっとちいさいファイル（サイズをちいさくしたしゃしん）を選んでね。`);
+            e.target.value = ""; // Reset input
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFile(reader.result); // Store Base64 string
+            setPreviewUrl(reader.result); // Base64 works as Src
+        };
+        reader.readAsDataURL(selected);
+    };
+
+    const clearFile = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        // Reset input value to allow selecting same file again
+        const input = document.getElementById("hidden-file-input");
+        if (input) input.value = "";
+    };
+
     // ... existing profile useEffect
 
     const executePost = async () => {
+        if (isUploading) return;
+        setIsUploading(true);
         try {
             const postName = name || (user.email ? user.email.split("@")[0] : "ゲスト");
             const postIcon = user.photoURL || null;
-            await addPost(user.uid, postName, postIcon, selectedMood, text, userGroups, user.affiliationId);
+            await addPost(user.uid, postName, postIcon, selectedMood, text, userGroups, selectedAffiliation, file);
 
             // Grant Rewards (Game Logic)
             const reward = await grantPostRewards(user.uid);
+
+            setIsQuizOpen(false); // Ensure quiz is closed
 
             if (isTutorialMode) {
                 // Skip reward screen during tutorial
@@ -122,14 +197,19 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                 setShowReward(true);
             }
 
+            setText("");
+            clearFile();
+
         } catch (error) {
             alert("とうこうできませんでした");
             console.error(error);
+        } finally {
+            setIsUploading(false);
         }
     };
 
     const handlePostClick = () => {
-        if (!text.trim()) {
+        if (!text.trim() && !file) {
             alert("メッセージを かいてみてね！");
             return;
         }
@@ -146,144 +226,18 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
             return;
         }
 
-        // Generate quiz based on settings
-        generateQuiz();
-    };
-
-    const generateQuiz = () => {
-        const types = quizSettings?.types || [];
-        const ops = quizSettings?.operations || ["add"];
-        const settingMax = quizSettings?.maxAnswer || 10;
-        const max = Math.min(settingMax, 99);
-
-        // Supported custom types
-        const SUPPORTED_TYPES = ["shape_10frame", "shape_blocks", "lang_opposites", "lang_odd_one"];
-        const validTypes = types.filter(t => SUPPORTED_TYPES.includes(t));
-
-        // All possible quiz "logics"
-        const availablePool = [];
-        if (ops.length > 0) availablePool.push("arithmetic");
-        validTypes.forEach(t => availablePool.push(t));
-
-        // Default to arithmetic if pool is empty
-        let selectedType = availablePool.length > 0
-            ? availablePool[Math.floor(Math.random() * availablePool.length)]
-            : "arithmetic";
-
-        let q = "", a = "", choices = null, visual = null;
-
-        // Loop once or twice to ensure q is not empty (fallback to arithmetic)
-        for (let attempt = 0; attempt < 2; attempt++) {
-            if (selectedType === "arithmetic") {
-                const op = ops[Math.floor(Math.random() * ops.length)] || "add";
-                if (op === "add") {
-                    const total = Math.floor(Math.random() * (Math.max(2, max) - 1)) + 2;
-                    const first = Math.floor(Math.random() * (total - 1)) + 1;
-                    const second = total - first;
-                    q = `${first} + ${second} = ?`;
-                    a = total.toString();
-                } else if (op === "sub") {
-                    const first = Math.floor(Math.random() * (Math.max(2, max) - 1)) + 2;
-                    const second = Math.floor(Math.random() * (first - 1)) + 1;
-                    q = `${first} - ${second} = ?`;
-                    a = (first - second).toString();
-                } else if (op === "mul") {
-                    const first = Math.floor(Math.random() * 9) + 1;
-                    const second = Math.floor(Math.random() * 9) + 1;
-                    q = `${first} × ${second} = ?`;
-                    a = (first * second).toString();
-                } else if (op === "div") {
-                    const ans = Math.floor(Math.random() * 9) + 1;
-                    const devisor = Math.floor(Math.random() * 9) + 1;
-                    q = `${ans * devisor} ÷ ${devisor} = ?`;
-                    a = ans.toString();
-                }
-            }
-            else if (selectedType === "shape_10frame") {
-                const count = Math.floor(Math.random() * 9) + 1;
-                const remaining = 10 - count;
-                q = "あと いくつで 10 になるかな？";
-                a = remaining.toString();
-                visual = { type: "10frame", count };
-                choices = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-            }
-            else if (selectedType === "shape_blocks") {
-                const count = Math.floor(Math.random() * 5) + 3;
-                q = "つみきは ぜんぶで いくつあるかな？";
-                a = count.toString();
-                visual = { type: "blocks", count };
-                choices = ["3", "4", "5", "6", "7", "8"];
-            }
-            else if (selectedType === "lang_opposites") {
-                const list = LANGUAGE_QUIZZES.opposites;
-                const pick = list[Math.floor(Math.random() * list.length)];
-                q = pick.q; a = pick.a; choices = pick.c;
-            }
-            else if (selectedType === "lang_odd_one") {
-                const list = LANGUAGE_QUIZZES.oddOneOut;
-                const pick = list[Math.floor(Math.random() * list.length)];
-                q = pick.q; a = pick.a; choices = pick.c;
-            }
-
-            if (q) break; // Success
-            selectedType = "arithmetic"; // Fallback for next attempt
-        }
-
-        // Final safety fallback
-        if (!q) {
-            q = "1 + 1 = ?";
-            a = "2";
-        }
-
-        setCurrentQuiz({ q, a, choices, visual });
-        setQuizAnswer("");
-        setIsQuizOpen(true);
-    };
-
-    const submitQuiz = async (choiceValue = null) => {
-        const answerToCheck = choiceValue !== null ? choiceValue : quizAnswer;
-        if (answerToCheck.toString() === currentQuiz.a.toString()) {
-            setIsQuizOpen(false);
-            executePost();
+        // Check settings: Default is TRUE if undefined
+        if (quizSettings?.quizBeforePost !== false) {
+            setIsQuizOpen(true);
         } else {
-            alert("ざんねん！もういちどチャレンジしてね");
-            setQuizAnswer("");
+            executePost();
         }
     };
 
     const handleRewardClose = () => {
         setShowReward(false);
         setText("");
-        setQuizAnswer("");
         if (onSuccess) onSuccess(); // Close the Post Modal
-    };
-
-    const renderQuizVisual = () => {
-        if (!currentQuiz.visual) return null;
-        const { type } = currentQuiz.visual;
-
-        if (type === "10frame") {
-            const dots = [];
-            for (let i = 0; i < 10; i++) {
-                dots.push(i < currentQuiz.visual.count);
-            }
-            return (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "5px", background: "#f0f0f0", padding: "10px", borderRadius: "8px", margin: "10px auto" }}>
-                    {dots.map((isFilled, idx) => (
-                        <div key={idx} style={{ width: "30px", height: "30px", borderRadius: "50%", background: isFilled ? "var(--primary)" : "white", border: "2px solid #ddd" }}></div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (type === "blocks") {
-            return (
-                <div style={{ fontSize: "2rem", margin: "10px 0" }}>
-                    {"🟥".repeat(currentQuiz.visual.count)}
-                </div>
-            );
-        }
-        return null;
     };
 
     const handleMoodSelect = (mood) => {
@@ -301,9 +255,33 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
             border: "1px solid rgba(0,0,0,0.05)"
         }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h3 style={{ margin: 0, color: "var(--primary)", fontSize: "1.2rem", fontWeight: "900" }}>
-                    ＼ きょうのきもちは？ ／
-                </h3>
+                <div>
+                    <h3 style={{ margin: 0, color: "var(--primary)", fontSize: "1.2rem", fontWeight: "900" }}>
+                        ＼ きょうのきもちは？ ／
+                    </h3>
+                    {affiliationOptions.length > 1 && (
+                        <div style={{ marginTop: "8px" }}>
+                            <select
+                                value={selectedAffiliation}
+                                onChange={(e) => setSelectedAffiliation(e.target.value)}
+                                style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "16px",
+                                    border: "2px solid var(--primary)",
+                                    fontSize: "0.9rem",
+                                    background: "white",
+                                    color: "var(--primary)",
+                                    fontWeight: "bold",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                {affiliationOptions.map(opt => (
+                                    <option key={opt.id} value={opt.id}>{opt.name} へ</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     {onClose && (
                         <button
@@ -382,91 +360,83 @@ export default function PostForm({ userGroups = [], onClose, onSuccess, isTutori
                 onBlur={(e) => e.target.style.borderColor = "rgba(0,0,0,0.05)"}
             />
 
-            <div style={{ textAlign: "right" }}>
+            {/* Media Preview */}
+            {previewUrl && (
+                <div style={{ position: "relative", width: "100%", borderRadius: "12px", overflow: "hidden", border: "1px solid #ddd", marginBottom: "15px" }}>
+                    <button
+                        onClick={clearFile}
+                        style={{
+                            position: "absolute", top: "5px", right: "5px",
+                            background: "rgba(0,0,0,0.6)", color: "white",
+                            border: "none", borderRadius: "50%",
+                            width: "24px", height: "24px",
+                            cursor: "pointer", zIndex: 10,
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                        }}
+                    >
+                        ✕
+                    </button>
+                    <img src={previewUrl} alt="Preview" style={{ width: "100%", display: "block", maxHeight: "200px", objectFit: "contain", background: "#f0f0f0" }} />
+                </div>
+            )}
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {mediaUploadEnabled && (
+                    <>
+                        <input
+                            id="hidden-file-input"
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            onChange={handleFileSelect}
+                        />
+                        <button
+                            onClick={() => document.getElementById("hidden-file-input").click()}
+                            className="btn"
+                            style={{
+                                background: "#f0f0f0",
+                                color: "#555",
+                                fontSize: "1.5rem",
+                                padding: "10px 15px",
+                                borderRadius: "12px"
+                            }}
+                            title="しゃしん・どうが"
+                        >
+                            📷
+                        </button>
+                    </>
+                )}
+
                 <button
                     id="tutorial-post-submit"
                     className="btn btn-primary"
                     onClick={handlePostClick}
+                    disabled={isUploading}
                     style={{
+                        flex: 1,
                         padding: "14px 32px",
                         fontSize: "1.1rem",
-                        boxShadow: "0 8px 20px rgba(var(--primary-h), 100%, 70%, 0.3)"
+                        boxShadow: "0 8px 20px rgba(var(--primary-h), 100%, 70%, 0.3)",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                        opacity: isUploading ? 0.7 : 1
                     }}
                 >
-                    🚀 とうこうする
+                    {isUploading ? "おくっています..." : "🚀 とうこうする"}
                 </button>
             </div>
 
-            {isQuizOpen && (
-                <div style={{
-                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: "rgba(0,0,0,0.4)",
-                    backdropFilter: "blur(8px)",
-                    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000
-                }}>
-                    <div className="animate-pop card" style={{ padding: "30px", textAlign: "center", width: "95%", maxWidth: "400px", border: "1px solid var(--glass-border)" }}>
-                        <h3 style={{ marginBottom: "20px", color: "var(--primary)", fontSize: "1.4rem", fontWeight: "900" }}>
-                            にこにこクイズ！
-                        </h3>
-
-                        <p style={{ fontSize: "1.4rem", fontWeight: "900", marginBottom: "15px" }}>{currentQuiz.q}</p>
-
-                        <div style={{ background: "rgba(0,0,0,0.03)", borderRadius: "var(--radius-md)", padding: "10px", marginBottom: "20px" }}>
-                            {renderQuizVisual()}
-                        </div>
-
-                        <div style={{ marginTop: "20px" }}>
-                            {currentQuiz.choices ? (
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                                    {currentQuiz.choices.map(choice => (
-                                        <button
-                                            key={choice}
-                                            className="btn"
-                                            style={{
-                                                background: "white",
-                                                fontSize: "1.2rem",
-                                                padding: "15px",
-                                                border: "2px solid rgba(0,0,0,0.05)"
-                                            }}
-                                            onClick={() => submitQuiz(choice)}
-                                        >
-                                            {choice}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <>
-                                    <input
-                                        type="number"
-                                        value={quizAnswer}
-                                        onChange={(e) => setQuizAnswer(e.target.value)}
-                                        style={{
-                                            padding: "15px",
-                                            fontSize: "2rem",
-                                            width: "140px",
-                                            textAlign: "center",
-                                            marginBottom: "25px",
-                                            border: "3px solid var(--primary)",
-                                            borderRadius: "15px",
-                                            boxShadow: "var(--shadow-sm)",
-                                            outline: "none"
-                                        }}
-                                        autoFocus
-                                    />
-                                    <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
-                                        <button className="btn" style={{ background: "rgba(0,0,0,0.05)", color: "var(--text-muted)" }} onClick={() => setIsQuizOpen(false)}>やめる</button>
-                                        <button className="btn btn-primary" onClick={() => submitQuiz()}>こたえる</button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <button onClick={() => setIsQuizOpen(false)} style={{ marginTop: "20px", background: "none", border: "none", color: "var(--text-muted)", textDecoration: "underline", cursor: "pointer", fontSize: "0.9rem" }}>
-                            やめる
-                        </button>
-                    </div>
-                </div>
-            )}
+            <QuizModal
+                isOpen={isQuizOpen}
+                onClose={() => setIsQuizOpen(false)}
+                onPass={() => {
+                    setIsQuizOpen(false);
+                    // Short timeout to allow modal close animation if needed, 
+                    // but immediate is better for responsiveness. 
+                    // We must ensure executePost runs.
+                    setTimeout(executePost, 0);
+                }}
+                settings={quizSettings}
+            />
 
             {showReward && (
                 <RewardModal

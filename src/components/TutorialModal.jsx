@@ -3,57 +3,22 @@ import { useState, useEffect, useRef } from "react";
 
 const TUTORIAL_STEPS = [
     {
-        title: "ようこそ！(保護者の方へ)",
-        content: "ニコニコひろばへようこそ。\nまずはじめに、お子様が安全に利用できるように設定を行いましょう。",
+        title: "ようこそ！",
+        content: "ニコニコひろばへようこそ。\nこれから 使い方の説明を するよ！",
         emoji: "👋",
         targetId: null
     },
     {
-        title: "1. 保護者設定を開く",
-        content: "画面上の「おうちのひとへ」ボタンを押してください。\nここから管理画面へアクセスできます。",
+        title: "大人の人への設定",
+        content: "画面上の「おうちのひとへ」ボタンから、いろいろな設定ができるよ。\n（初期パスワードは「2525」です）",
         emoji: "👨‍👩‍👧‍👦",
         targetId: "tutorial-parent-btn",
-        action: "click",
-        position: "bottom"
+        action: "next",
+        position: "bottom",
+        hidePointer: true
     },
     {
-        title: "2. パスワード入力",
-        content: "初期パスワード「2525」を入力して、「OK」を押してください。",
-        emoji: "🔐",
-        targetId: "tutorial-parent-login-btn",
-        action: "click",
-        position: "bottom"
-    },
-    {
-        title: "3. 各種設定について",
-        content: "ここではクイズの難易度や、機能設定（ゲームなど）、パスワードの変更などができます。\nお子様の成長に合わせて調整してください。",
-        emoji: "⚙️",
-        targetId: "tutorial-tab-quiz",
-        action: "next"
-    },
-    {
-        title: "4. 所属の設定",
-        content: "次に、「所属」タブを押してください。\nここでお子様の通っているスクールや園を選択します。",
-        emoji: "🏫",
-        targetId: "tutorial-tab-affiliation",
-        action: "click"
-    },
-    {
-        title: "5. 保存する",
-        content: "所属を選んだら、一番下の「設定を保存する」ボタンを押してください。",
-        emoji: "💾",
-        targetId: "tutorial-save-affiliation-btn",
-        action: "click",
-        position: "viewport-top"
-    },
-    {
-        title: "バトンタッチ！",
-        content: "これで保護者設定は完了です。\nここからは、お子様と一緒に操作してみてください！",
-        emoji: "🤝",
-        targetId: null
-    },
-    {
-        title: "6. プロフィール設定",
+        title: "1. プロフィール設定",
         content: "まずは、じぶんだけの アイコンや いろを きめよう！\n「⚙️（歯車）」ボタンを おしてみてね。",
         emoji: "🎨",
         targetId: "tutorial-settings-btn",
@@ -61,35 +26,35 @@ const TUTORIAL_STEPS = [
         position: "bottom"
     },
     {
-        title: "7. アイコンをえらぶ",
+        title: "2. アイコンをえらぶ",
         content: "すきな アイコンを えらんで、「OK」ボタンを おしてね。",
         emoji: "🖼️",
         targetId: "tutorial-settings-save-btn",
         action: "click"
     },
     {
-        title: "8. グループをさがそう",
+        title: "3. グループをさがそう",
         content: "「さがす」ボタンを おして、みんなが いる グループに はいってみよう！",
         emoji: "🔍",
         targetId: "tutorial-groups-tab",
         action: "click"
     },
     {
-        title: "9. ひろばに もどろう",
+        title: "4. ひろばに もどろう",
         content: "「ひろば」ボタンを おして、みんなの いる ばしょに もどろう！",
         emoji: "🏠",
         targetId: "tutorial-home-tab",
         action: "click"
     },
     {
-        title: "10. きもちを かいてみよう",
+        title: "5. きもちを かいてみよう",
         content: "「えんぴつ」ボタンで、いまの きもちを とうこう してみよう。\nスタンプも おせるよ！",
         emoji: "✏️",
         targetId: "tutorial-post-fab",
         action: "click"
     },
     {
-        title: "11. きもちを えらぼう",
+        title: "6. きもちを えらぼう",
         content: "まずは、いまの きぶんを えらんでね。\nそのあと、メッセージを かけるよ！",
         emoji: "🤔",
         targetId: "tutorial-mood-area",
@@ -97,7 +62,7 @@ const TUTORIAL_STEPS = [
         position: "bottom"
     },
     {
-        title: "12. とうこうする",
+        title: "7. とうこうする",
         content: "きもちを かいたら、「とうこうする」ボタンを おしてね。",
         emoji: "✉️",
         targetId: "tutorial-post-submit",
@@ -105,14 +70,21 @@ const TUTORIAL_STEPS = [
         position: "top"
     },
     {
-        title: "13. ペットと あそぼう",
+        title: "8. ペットと あそぼう",
         content: "とうこうすると、ペットが よろこぶよ！\n「ペット」タブを おして、ようすを みてみてね。",
         emoji: "🐶",
         targetId: "tutorial-pet-tab",
         action: "next"
     },
     {
-        title: "14. ゲームをつくろう！",
+        title: "9. ひろばに もどろう",
+        content: "「ひろば」ボタンを おして、ニコニコひろばに もどろう！",
+        emoji: "🏠",
+        targetId: "tutorial-home-tab",
+        action: "click"
+    },
+    {
+        title: "10. ゲームをつくろう！",
         content: "「🎮」ボタンから「ゲームを つくる」をえらぶと、じぶんだけのゲームを おねがい できるよ！",
         emoji: "👾",
         targetId: "tutorial-game-fab",
@@ -121,18 +93,18 @@ const TUTORIAL_STEPS = [
         hidePointer: true
     },
     {
-        title: "15. ゲームであそぶ",
-        content: "ゲームができると、画面の上に「🎮」ボタンがでてくるよ。\nここから いつでも あそべるよ！",
+        title: "11. ゲームであそぶ",
+        content: "画面の上の「🎮」ボタンを おすと、いつでも じぶんのゲームで あそべるよ！",
         emoji: "🕹️",
         targetId: "app-header",
         action: "next",
         position: "bottom"
     },
     {
-        title: "16. おともだちのゲーム",
+        title: "12. おともだちのゲーム",
         content: "おともだちの アイコンを おすと、その子がつくったゲームで あそべるよ！\nみんなのゲームを さがしてみてね。",
         emoji: "🔍",
-        targetId: "tutorial-home-tab",
+        targetId: null,
         action: "next"
     },
     {

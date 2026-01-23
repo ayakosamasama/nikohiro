@@ -31,8 +31,7 @@ export const subscribeToGroups = (affiliationId = "default", callback) => {
         affiliationId = "default";
     }
 
-    // Ensure init runs once (simplified) - suppress error if non-admin
-    initGroups().catch(err => console.warn("Init groups skipped:", err.code));
+
 
     // Note: To support "missing affiliationId = default", we need client-side filtering 
     // or a comprehensive backfill. For a small app, client-side filtering is acceptable.
@@ -43,9 +42,10 @@ export const subscribeToGroups = (affiliationId = "default", callback) => {
     // but then we can't see "Global" groups if we wanted to sharing them (though requirement says strict isolation).
 
     return onSnapshot(collection(db, GROUPS_COLLECTION), (snapshot) => {
-        const groups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const groups = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
         const filtered = groups.filter(g => {
+            if (affiliationId === "all" || affiliationId === null) return true;
             const gAff = g.affiliationId || "default";
             const uAff = affiliationId || "default";
             return gAff === uAff;
@@ -67,18 +67,14 @@ export const leaveGroup = async (userId, groupId) => {
     await deleteDoc(doc(db, GROUPS_COLLECTION, groupId, MEMBERS_COLLECTION, userId));
 };
 
-export const subscribeToUserGroups = (userId, callback) => {
-    // Can't easily query "all subcollections" in Firestore without Collection Group Queries usually.
-    // For this simple app, we'll fetch all groups and then check if the user is a member of each.
-    // OR simpler: Store "joinedGroups" in the user profile. 
-    // Let's do the "fetch all groups and check membership" for now, or just store a list of joined GroupIDs locally/in user doc?
-
-    // Alternative: Subcollection 'members' is good for scalability (many members), but hard to list "my groups".
-    // Let's use a simpler approach for "My Groups": A subcollection in USER doc.
-
+export const subscribeToUserGroups = (userId, callback, onError) => {
+    // ...
     return onSnapshot(collection(db, "users", userId, "joinedGroups"), (snapshot) => {
         const groupIds = snapshot.docs.map(doc => doc.id);
         callback(groupIds);
+    }, (error) => {
+        console.error("User groups subscription error:", error);
+        if (onError) onError(error);
     });
 };
 

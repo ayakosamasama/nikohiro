@@ -85,17 +85,13 @@ export const grantPostRewards = async (userId, forceEgg = false, xpMultiplier = 
     const canFindEgg = !userData.pet || (userData.pet.level >= 70);
 
     if (canFindEgg) {
-        const roll = Math.random();
-        // 30% chance or forced
-        if (roll < 0.3 || forceEgg) {
-            eggFound = true;
-            // Pick random pet ID based on available PETS
-            const petIds = Object.keys(PETS);
-            // petIds are like ["pet01", "pet02", ...]. We assume they are strictly 1..N or just pick from array.
-            // Safer to pick from array directly.
-            const randomId = petIds[Math.floor(Math.random() * petIds.length)];
-            potentialPetId = randomId;
-        }
+        // Always find egg (100% chance)
+        eggFound = true;
+
+        // Pick random pet ID based on available PETS
+        const petIds = Object.keys(PETS);
+        const randomId = petIds[Math.floor(Math.random() * petIds.length)];
+        potentialPetId = randomId;
     }
 
     await updateDoc(userRef, updates);

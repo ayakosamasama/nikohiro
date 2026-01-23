@@ -2,8 +2,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
-
 import { getUserProfile } from "../services/userService";
+import { subscribeToSystemConfig } from "../services/adminService";
+import { subscribeToUserGroups } from "../services/groupService";
+import { subscribeToMessages } from "../services/messageService";
 
 const AuthContext = createContext({});
 
@@ -11,32 +13,76 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [profile, setProfile] = useState(null); // Added profile state for reactivity
     const [loading, setLoading] = useState(true);
+    const [isMaintenance, setIsMaintenance] = useState(false);
+    const [groupIds, setGroupIds] = useState([]);
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+
+    // Maintenance Listener
+    useEffect(() => {
+        const unsub = subscribeToSystemConfig((config) => {
+            const isMaint = !!config?.maintenanceMode;
+            setIsMaintenance(isMaint);
+
+            // Critical: Forced logout if maintenance is ON and user is NOT admin
+            if (isMaint && user && !user.isAdmin) {
+                console.log("Maintenance mode active: Logging out non-admin user.");
+                signOut(auth);
+            }
+        });
+        return () => unsub();
+    }, [user, user?.isAdmin]);
+
+    // Group & Message Subscriptions
+    // 1. Group Subscription
+    useEffect(() => {
+        if (user) {
+            const unsubGroups = subscribeToUserGroups(user.uid, (ids) => {
+                // Avoid redundant updates if IDs haven't changed (shallow comparison)
+                setGroupIds(prev => {
+                    if (prev.length === ids.length && prev.every((val, index) => val === ids[index])) {
+                        return prev;
+                    }
+                    return ids;
+                });
+            }, () => setLoading(false));
+            return () => unsubGroups();
+        } else {
+            setGroupIds([]);
+        }
+    }, [user]);
+
+    // 2. Message Subscription (Depends on Groups)
+    useEffect(() => {
+        if (user) {
+            const unsubMessages = subscribeToMessages({
+                uid: user.uid,
+                affiliationIds: user.affiliations || [],
+                groupIds: groupIds
+            }, (msgs) => {
+                const unread = msgs.filter(m => !m.status?.read).length;
+                setUnreadMessageCount(unread);
+            }, () => setLoading(false));
+            return () => unsubMessages();
+        } else {
+            setUnreadMessageCount(0);
+        }
+    }, [user, user?.affiliations, groupIds]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
+            setUser(u);
             if (u) {
-                // Load theme and admin status
-                try {
-                    const profileData = await getUserProfile(u.uid);
-                    if (profileData) {
-                        if (profileData.themeColor) {
-                            const colorVar = `var(--color-${profileData.themeColor})`;
-                            document.documentElement.style.setProperty("--primary", colorVar);
-                        }
-                        // Add properties to user object instance
-                        u.isAdmin = !!profileData.isAdmin;
-                        u.affiliationId = profileData.affiliationId;
-                        setProfile(profileData);
-                    }
-                } catch (e) {
-                    console.error("Profile load failed", e);
+                const profile = await getUserProfile(u.uid);
+                if (profile?.themeColor) {
+                    const colorVar = `var(--color-${profile.themeColor})`;
+                    document.documentElement.style.setProperty("--primary", colorVar);
                 }
-                setUser(u);
+                // Sync important properties to user object
+                u.isAdmin = !!profile?.isAdmin;
+                u.affiliationId = profile?.affiliationId;
+                u.affiliations = profile?.affiliations || (profile?.affiliationId ? [profile.affiliationId] : []);
             } else {
-                setUser(null);
-                setProfile(null);
                 document.documentElement.style.setProperty("--primary", "var(--color-orange)");
             }
             setLoading(false);
@@ -45,11 +91,21 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribe();
     }, []);
 
-    const login = (email, password) => {
-        return signInWithEmailAndPassword(auth, email, password);
+    const login = async (email, password) => {
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        // Secondary check: if maintenance is on and newly logged in user is NOT admin
+        const profile = await getUserProfile(cred.user.uid);
+        if (isMaintenance && !profile?.isAdmin) {
+            await signOut(auth);
+            throw new Error("現在メンテナンス中のため、管理ユーザー以外はログインできません。");
+        }
+        return cred;
     };
 
     const signup = (email, password) => {
+        if (isMaintenance) {
+            throw new Error("現在メンテナンス中のため、新規登録はできません。");
+        }
         return createUserWithEmailAndPassword(auth, email, password);
     };
 
@@ -57,34 +113,29 @@ export const AuthProvider = ({ children }) => {
         return signOut(auth);
     };
 
+    // refreshProfile now re-fetches the profile
     const refreshProfile = async () => {
-        if (auth.currentUser) {
-            const profileData = await getUserProfile(auth.currentUser.uid);
-            if (profileData) {
-                // Determine theme
-                if (profileData.themeColor) {
-                    const colorVar = `var(--color-${profileData.themeColor})`;
-                    document.documentElement.style.setProperty("--primary", colorVar);
-                }
-
-                // Add properties to user object instance directly
-                auth.currentUser.isAdmin = !!profileData.isAdmin;
-                auth.currentUser.affiliationId = profileData.affiliationId;
-
-                // Set profile to trigger re-renders in components using AuthContext
-                setProfile({ ...profileData });
-                // We also re-set user just in case, though it's the same ref
-                setUser(auth.currentUser);
+        if (user) {
+            const profile = await getUserProfile(user.uid);
+            if (profile?.themeColor) {
+                const colorVar = `var(--color-${profile.themeColor})`;
+                document.documentElement.style.setProperty("--primary", colorVar);
             }
+            user.isAdmin = !!profile?.isAdmin;
+            user.affiliationId = profile?.affiliationId;
+            user.affiliations = profile?.affiliations || (profile?.affiliationId ? [profile.affiliationId] : []);
         }
     };
 
     return (
         <AuthContext.Provider value={{
             user,
-            profile,
-            isAdmin: profile?.isAdmin || false,
-            affiliationId: profile?.affiliationId || null,
+            isAdmin: user?.isAdmin || false,
+            affiliationId: user?.affiliationId || null,
+            affiliations: user?.affiliations || [],
+            groupIds,
+            unreadMessageCount,
+            isMaintenance,
             login, signup, logout, loading, refreshProfile
         }}>
             {!loading && children}

@@ -5,12 +5,15 @@ import { useState, useEffect } from "react";
 import ProfileSettings from "./ProfileSettings";
 import ParentSettings from "./ParentSettings";
 
+import QuizModal from "./QuizModal";
+
 export default function Header() {
-    const { user, profile, isAdmin, logout } = useAuth();
+    const { user, profile, isAdmin, logout, unreadMessageCount } = useAuth();
     const router = useRouter();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isParentSettingsOpen, setIsParentSettingsOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [isQuizOpen, setIsQuizOpen] = useState(false);
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth <= 600);
@@ -18,6 +21,25 @@ export default function Header() {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    const handleMyGameClick = () => {
+        if (!profile?.gameUrl) return;
+
+        // Check settings: Default is FALSE
+        const quizBeforeGame = profile.quizSettings?.quizBeforeGame === true;
+
+        if (quizBeforeGame) {
+            setIsQuizOpen(true);
+        } else {
+            launchGame();
+        }
+    };
+
+    const launchGame = () => {
+        setIsQuizOpen(false);
+        const url = new URL(profile.gameUrl, window.location.origin);
+        window.open(url.toString(), "_blank");
+    };
 
     return (
         <header id="app-header" className="glass" style={{
@@ -71,7 +93,7 @@ export default function Header() {
                     {/* My Game Button (Visible on ALL devices) */}
                     {profile?.gameUrl && (
                         <button
-                            onClick={() => window.open(profile.gameUrl, "_blank")}
+                            onClick={handleMyGameClick}
                             className="btn"
                             style={{
                                 background: "var(--color-purple)",
@@ -103,10 +125,31 @@ export default function Header() {
                                     background: "rgba(0,0,0,0.05)",
                                     padding: "6px 12px",
                                     fontSize: "0.8rem",
-                                    color: "var(--text-main)"
+                                    color: "var(--text-main)",
+                                    position: "relative"
                                 }}
                             >
                                 おうちのひとへ
+                                {unreadMessageCount > 0 && (
+                                    <span style={{
+                                        position: "absolute",
+                                        top: "-5px",
+                                        right: "-5px",
+                                        background: "var(--color-red)",
+                                        color: "white",
+                                        borderRadius: "50%",
+                                        width: "18px",
+                                        height: "18px",
+                                        fontSize: "0.7rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontWeight: "bold",
+                                        boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                                    }}>
+                                        {unreadMessageCount}
+                                    </span>
+                                )}
                             </button>
                         </div>
                     )}
@@ -165,15 +208,43 @@ export default function Header() {
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                flexShrink: 0
+                                flexShrink: 0,
+                                position: "relative"
                             }}
                         >
                             🏠
+                            {unreadMessageCount > 0 && (
+                                <span style={{
+                                    position: "absolute",
+                                    top: "-5px",
+                                    right: "-5px",
+                                    background: "var(--color-red)",
+                                    color: "white",
+                                    borderRadius: "50%",
+                                    width: "18px",
+                                    height: "18px",
+                                    fontSize: "0.7rem",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold",
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                                }}>
+                                    {unreadMessageCount}
+                                </span>
+                            )}
                         </button>
                     )}
 
                     <ProfileSettings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
                     <ParentSettings isOpen={isParentSettingsOpen} onClose={() => setIsParentSettingsOpen(false)} />
+
+                    <QuizModal
+                        isOpen={isQuizOpen}
+                        onClose={() => setIsQuizOpen(false)}
+                        onPass={launchGame}
+                        settings={profile?.quizSettings}
+                    />
                 </div>
             )}
 

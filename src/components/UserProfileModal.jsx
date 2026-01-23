@@ -5,12 +5,14 @@ import { getUserProfile } from "../services/userService";
 import { PETS } from "../data/gameData";
 import PetDisplay from "./PetDisplay";
 
+import QuizModal from "./QuizModal";
+
 export default function UserProfileModal({ userId, onClose }) {
-    const { user } = useAuth();
+    const { profile: viewerProfile, user } = useAuth(); // Get current user profile for their settings
     const [profile, setProfile] = useState(null);
-    const { user: currentUser } = useAuth(); // Get current user for their settings
     const [loading, setLoading] = useState(false);
     const [showPets, setShowPets] = useState(true);
+    const [isQuizOpen, setIsQuizOpen] = useState(false);
 
     // Check viewer's settings
     useEffect(() => {
@@ -44,21 +46,34 @@ export default function UserProfileModal({ userId, onClose }) {
         fetchProfile();
     }, [userId]);
 
-    const handlePlayGame = () => {
+    const handlePlayClick = () => {
         if (!profile?.gameUrl) return;
 
         // Use viewer's settings
-        if (currentUser?.settings?.gameFeatureEnabled === false) return;
+        if (viewerProfile?.settings?.gameFeatureEnabled === false) return;
+
+        // Check quiz settings: Default is FALSE
+        const quizBeforeGame = viewerProfile?.quizSettings?.quizBeforeGame === true;
+
+        if (quizBeforeGame) {
+            setIsQuizOpen(true);
+        } else {
+            launchGame();
+        }
+    };
+
+    const launchGame = () => {
+        setIsQuizOpen(false);
 
         let limit = 15; // Default
         let totalLimit = 60; // Default
 
-        if (currentUser) {
-            if (currentUser.gameTimeLimit !== undefined) limit = currentUser.gameTimeLimit;
-            if (currentUser.totalGameTimeLimit !== undefined) totalLimit = currentUser.totalGameTimeLimit;
+        if (viewerProfile) {
+            if (viewerProfile.gameTimeLimit !== undefined) limit = viewerProfile.gameTimeLimit;
+            if (viewerProfile.totalGameTimeLimit !== undefined) totalLimit = viewerProfile.totalGameTimeLimit;
         }
 
-        const url = new URL(profile.gameUrl);
+        const url = new URL(profile.gameUrl, window.location.origin);
         if (limit > 0) url.searchParams.set('timeLimit', limit);
         if (totalLimit > 0) url.searchParams.set('totalLimit', totalLimit);
 
@@ -127,7 +142,7 @@ export default function UserProfileModal({ userId, onClose }) {
 
                         {profile.gameUrl && (
                             <button
-                                onClick={() => window.open(profile.gameUrl, "_blank")}
+                                onClick={handlePlayClick}
                                 style={{
                                     width: "100%",
                                     padding: "12px",
@@ -151,6 +166,12 @@ export default function UserProfileModal({ userId, onClose }) {
 
                         {/* Optional: Add user group info if we want */}
 
+                        <QuizModal
+                            isOpen={isQuizOpen}
+                            onClose={() => setIsQuizOpen(false)}
+                            onPass={launchGame}
+                            settings={viewerProfile?.quizSettings}
+                        />
                     </>
                 ) : (
                     <p>ユーザーが見つかりませんでした</p>

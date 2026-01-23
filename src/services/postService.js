@@ -3,10 +3,12 @@ import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, where,
 
 const COLLECTION_NAME = "posts";
 
-export const addPost = async (userId, userName, userIcon, mood, text, userGroups = [], affiliationId = "default") => {
+export const addPost = async (userId, userName, userIcon, mood, text, userGroups = [], affiliationId = "default", file = null, onProgress = null) => {
     try {
-        // 1. Find existing posts by this user
-        const q = query(collection(db, COLLECTION_NAME), where("userId", "==", userId));
+        // In Base64 mode, 'file' is the base64 string
+        let mediaBase64 = file;
+        // Limit: One post per user PER AFFILIATION
+        const q = query(collection(db, COLLECTION_NAME), where("userId", "==", userId), where("affiliationId", "==", affiliationId));
         const snapshot = await getDocs(q);
 
         // 2. Delete them
@@ -22,6 +24,8 @@ export const addPost = async (userId, userName, userIcon, mood, text, userGroups
             text,
             userGroups,
             affiliationId, // Save affiliation
+            mediaUrl: mediaBase64, // Save Base64 string directly
+            mediaType: mediaBase64 ? 'image' : null,
             createdAt: serverTimestamp(),
             likes: 0
         });
@@ -31,30 +35,18 @@ export const addPost = async (userId, userName, userIcon, mood, text, userGroups
     }
 };
 
-export const subscribeToPosts = (affiliationId = "default", callback) => {
-    // Backward compatibility
-    if (typeof affiliationId === "function") {
-        callback = affiliationId;
-        affiliationId = "default";
-    }
+export const subscribeToPosts = (callback) => {
+    const postsRef = collection(db, COLLECTION_NAME);
+    const q = query(postsRef, orderBy("createdAt", "desc"));
 
-    const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snapshot) => {
-        const allPosts = snapshot.docs.map(doc => ({
+        const posts = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         }));
-
-        // Client-side isolation filter
-        const filtered = allPosts.filter(p => {
-            const pAff = p.affiliationId || "default";
-            const uAff = affiliationId || "default";
-            return pAff === uAff;
-        });
-
-        callback(filtered);
+        callback(posts);
     }, (error) => {
-        console.error("Posts snapshot error:", error);
+        console.error("Posts subscription error:", error);
     });
 };
 
@@ -64,18 +56,17 @@ export const toggleReaction = async (postId, userId, reactionType) => {
 
     if (!postSnap.exists()) return;
 
-    const postData = postSnap.data();
-    const reactions = postData.reactions || {};
-    const users = reactions[reactionType] || [];
+    const post = postSnap.data();
+    const reactions = post.reactions || {};
+    const userIds = reactions[reactionType] || [];
 
-    let newUsers;
-    if (users.includes(userId)) {
-        newUsers = users.filter(id => id !== userId);
-    } else {
-        newUsers = [...users, userId];
-    }
+    const isReacted = userIds.includes(userId);
+
+    const updatedUserIds = isReacted
+        ? userIds.filter(id => id !== userId)
+        : [...userIds, userId];
 
     await updateDoc(postRef, {
-        [`reactions.${reactionType}`]: newUsers
+        [`reactions.${reactionType}`]: updatedUserIds
     });
 };

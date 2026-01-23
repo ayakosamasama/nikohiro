@@ -25,6 +25,8 @@ export const subscribeToNgWords = (callback) => {
         } else {
             callback([]);
         }
+    }, (error) => {
+        console.error("NG Words subscription error:", error);
     });
 };
 
@@ -46,4 +48,63 @@ export const removeNgWord = async (word) => {
     await updateDoc(SAFETY_DOC_REF, {
         ngWords: arrayRemove(word)
     });
+};
+
+// --- User-Affiliation Assignment ---
+
+export const assignUserToAffiliation = async (userId, affiliationId) => {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+        affiliations: arrayUnion(affiliationId),
+        // If they don't have a primary affiliation set, or it's default, set this as primary
+        affiliationId: affiliationId
+    });
+};
+
+export const removeUserFromAffiliation = async (userId, affiliationId) => {
+    if (affiliationId === "default") return; // Keep default
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+        affiliations: arrayRemove(affiliationId)
+    });
+};
+
+export const getUsersByAffiliation = async (affiliationId) => {
+    const querySnapshot = await getDocs(collection(db, "users"));
+    const allUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    if (affiliationId === "all") return allUsers;
+
+    return allUsers.filter(u =>
+        (u.affiliations && u.affiliations.includes(affiliationId)) ||
+        u.affiliationId === affiliationId ||
+        (affiliationId === "default" && (!u.affiliationId || u.affiliationId === "default"))
+    );
+};
+// --- System Config & Maintenance ---
+
+const CONFIG_DOC_REF = doc(db, "system", "config");
+
+export const subscribeToSystemConfig = (callback) => {
+    return onSnapshot(CONFIG_DOC_REF, (doc) => {
+        if (doc.exists()) {
+            callback(doc.data());
+        } else {
+            callback({ maintenanceMode: false });
+        }
+    }, (error) => {
+        console.error("System Config subscription error:", error);
+    });
+};
+
+export const updateMaintenanceMode = async (enabled) => {
+    const d = await getDoc(CONFIG_DOC_REF);
+    if (!d.exists()) {
+        await setDoc(CONFIG_DOC_REF, { maintenanceMode: enabled, lastUpdated: new Date() });
+    } else {
+        await updateDoc(CONFIG_DOC_REF, {
+            maintenanceMode: enabled,
+            lastUpdated: new Date()
+        });
+    }
 };

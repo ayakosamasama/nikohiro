@@ -1,6 +1,6 @@
 import { db } from "../lib/firebase";
 import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, getDoc, query, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
-import { createAffiliationGroups } from "./groupService";
+import { createAffiliationGroups, initGroups } from "./groupService";
 
 const AFFILIATIONS_COLLECTION = "affiliations";
 
@@ -14,6 +14,8 @@ export const initAffiliations = async () => {
             isDefault: true,
             createdAt: new Date()
         });
+        // Create default groups (legacy/root) only once
+        await initGroups();
     }
 };
 

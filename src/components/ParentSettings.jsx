@@ -2,13 +2,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getUserProfile, updateUserProfile } from "../services/userService";
-import { getAffiliations } from "../services/affiliationService"; // Import affiliation service
+import { getAffiliations } from "../services/affiliationService";
+import { createInvitation, validateInvitation } from "../services/invitationService"; // Added imports
 import { addRequest } from "../services/requestService";
+import { subscribeToMessages, markAsRead, deleteUserMessage } from "../services/messageService";
 import { updatePassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
 export default function ParentSettings({ isOpen, onClose }) {
-    const { user, refreshProfile, logout } = useAuth(); // Destructure logout
+    const { user, profile, groupIds, unreadMessageCount, refreshProfile, logout } = useAuth(); // Destructure logout
 
     // Gatekeeper State
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -39,11 +41,18 @@ export default function ParentSettings({ isOpen, onClose }) {
     const [gameTimeLimit, setGameTimeLimit] = useState(15); // Default 15 minutes per session
     const [totalGameTimeLimit, setTotalGameTimeLimit] = useState(60); // Default 60 minutes per day
     const [gameFeatureEnabled, setGameFeatureEnabled] = useState(true); // Default true
+    const [mediaUploadEnabled, setMediaUploadEnabled] = useState(true); // Default true
+    const [mediaViewEnabled, setMediaViewEnabled] = useState(true); // Default true
     const [showPets, setShowPets] = useState(true);
 
     // Affiliation State
     const [affiliations, setAffiliations] = useState([]); // Affiliations list
-    const [selectedAffiliation, setSelectedAffiliation] = useState(""); // User's current affiliation
+    const [selectedAffiliations, setSelectedAffiliations] = useState([]); // User's affiliations (Array)
+    const [invitationCode, setInvitationCode] = useState("");
+    const [generatedCode, setGeneratedCode] = useState(null);
+
+    // Messaging State
+    const [messages, setMessages] = useState([]);
 
     useEffect(() => {
         if (isOpen && user) {
@@ -56,6 +65,22 @@ export default function ParentSettings({ isOpen, onClose }) {
             getAffiliations().then(data => setAffiliations(data)).catch(console.error);
         }
     }, [isOpen, user]);
+
+    // Subscribe to messages when authenticated and open
+    useEffect(() => {
+        if (isOpen && isAuthenticated && user) {
+            const unsub = subscribeToMessages({
+                uid: user.uid,
+                affiliationIds: selectedAffiliations,
+                groupIds: groupIds
+            }, (msgs) => {
+                // Sort messages: newest first
+                const sorted = [...msgs].sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+                setMessages(sorted);
+            });
+            return () => unsub();
+        }
+    }, [isOpen, isAuthenticated, user, selectedAffiliations, groupIds]);
 
     const loadSettings = async () => {
         if (!user) return;
@@ -88,12 +113,19 @@ export default function ParentSettings({ isOpen, onClose }) {
                 if (profile.settings && profile.settings.gameFeatureEnabled !== undefined) {
                     setGameFeatureEnabled(profile.settings.gameFeatureEnabled);
                 }
+                if (profile.settings && profile.settings.mediaUploadEnabled !== undefined) {
+                    setMediaUploadEnabled(profile.settings.mediaUploadEnabled);
+                }
+                if (profile.settings && profile.settings.mediaViewEnabled !== undefined) {
+                    setMediaViewEnabled(profile.settings.mediaViewEnabled);
+                }
                 // Load Show Pets
                 if (profile.settings && profile.settings.showPets !== undefined) {
                     setShowPets(profile.settings.showPets);
                 }
                 // Load Affiliation
-                setSelectedAffiliation(profile.affiliationId || "");
+                const loadedAffiliations = profile.affiliations || (profile.affiliationId ? [profile.affiliationId] : []);
+                setSelectedAffiliations(loadedAffiliations);
             }
         } catch (error) {
             console.error("Failed to load settings", error);
@@ -111,6 +143,24 @@ export default function ParentSettings({ isOpen, onClose }) {
 
     const handleSaveSettings = async () => {
         if (!user) return;
+
+        // Dirty checking
+        const hasChanges =
+            JSON.stringify(quizSettings) !== JSON.stringify(profile?.quizSettings || { maxAnswer: 2, operations: ["add"], categories: ["arithmetic"] }) ||
+            JSON.stringify(usageLimit) !== JSON.stringify(profile?.usageLimit || { enabled: false, start: "21:00", end: "07:00" }) ||
+            gameTimeLimit !== (profile?.gameTimeLimit ?? 15) ||
+            totalGameTimeLimit !== (profile?.totalGameTimeLimit ?? 60) ||
+            gameFeatureEnabled !== (profile?.settings?.gameFeatureEnabled ?? true) ||
+            mediaUploadEnabled !== (profile?.settings?.mediaUploadEnabled ?? true) ||
+            mediaViewEnabled !== (profile?.settings?.mediaViewEnabled ?? true) ||
+            showPets !== (profile?.settings?.showPets ?? true) ||
+            JSON.stringify(selectedAffiliations) !== JSON.stringify(profile?.affiliations || (profile?.affiliationId ? [profile?.affiliationId] : []));
+
+        if (!hasChanges) {
+            onClose();
+            return;
+        }
+
         setLoading(true);
         try {
             await updateUserProfile(user.uid, {
@@ -119,8 +169,11 @@ export default function ParentSettings({ isOpen, onClose }) {
                 gameTimeLimit,
                 totalGameTimeLimit,
                 "settings.gameFeatureEnabled": gameFeatureEnabled,
+                "settings.mediaUploadEnabled": mediaUploadEnabled,
+                "settings.mediaViewEnabled": mediaViewEnabled,
                 "settings.showPets": showPets,
-                affiliationId: selectedAffiliation // Save selected affiliation
+                affiliations: selectedAffiliations, // Save array
+                affiliationId: selectedAffiliations.length > 0 ? selectedAffiliations[0] : null // Primary (Legacy)
             });
             alert("設定を保存しました！");
             await refreshProfile(); // Refresh context without reload
@@ -220,6 +273,70 @@ export default function ParentSettings({ isOpen, onClose }) {
         });
     };
 
+    const handleJoinAffiliation = async () => {
+        if (!invitationCode) return;
+        setLoading(true);
+        try {
+            const affiliationId = await validateInvitation(invitationCode);
+
+            // Check if already joined
+            if (selectedAffiliations.includes(affiliationId)) {
+                alert("すでに参加しています");
+                setLoading(false);
+                return;
+            }
+
+            // Add and Save
+            const newAffiliations = [...selectedAffiliations, affiliationId];
+            setSelectedAffiliations(newAffiliations);
+
+            // Save to DB immediately
+            await updateUserProfile(user.uid, {
+                affiliations: newAffiliations,
+                affiliationId: newAffiliations[0] // Default to first if needed
+            });
+
+            alert("グループに参加しました！");
+            setInvitationCode("");
+            await refreshProfile();
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGenerateInvitation = async (affiliationId) => {
+        setLoading(true);
+        try {
+            const code = await createInvitation(affiliationId, user.uid);
+            setGeneratedCode(code);
+        } catch (error) {
+            console.error(error);
+            alert("招待コードの発行に失敗しました: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReadMessage = async (msgId) => {
+        try {
+            await markAsRead(user.uid, msgId);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleDeleteMessage = async (msgId) => {
+        if (!confirm("このメッセージを削除しますか？")) return;
+        try {
+            await deleteUserMessage(user.uid, msgId);
+        } catch (e) {
+            console.error(e);
+            alert("削除に失敗しました");
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -239,28 +356,59 @@ export default function ParentSettings({ isOpen, onClose }) {
                     👨‍👩‍👧‍👦 おうちのひとへ
                 </h2>
 
-                {!isAuthenticated ? (
-                    // Gatekeeper
-                    <div style={{ textAlign: "center" }}>
-                        <p style={{ marginBottom: "15px" }}>パスワードを入力してください（初期: 2525）</p>
+                {!isAuthenticated && (
+                    <form
+                        onSubmit={(e) => { e.preventDefault(); handleLogin(); }}
+                        style={{ padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}
+                    >
+                        <h3 style={{ marginBottom: "20px" }}>保護者用設定</h3>
+                        <p style={{ marginBottom: "30px", color: "#666" }}>パスワード（暗証番号）を入力してください（初期: 2525）</p>
+
                         <input
                             id="tutorial-parent-pin-input"
-                            type="password"
+                            type="text"
+                            autoComplete="off"
+                            name="p-pin-gatekeeper"
                             value={inputPin}
                             onChange={(e) => setInputPin(e.target.value)}
                             placeholder="****"
                             style={{
                                 fontSize: "2rem", textAlign: "center", letterSpacing: "10px",
-                                width: "200px", padding: "10px", marginBottom: "20px"
+                                width: "200px", padding: "10px", marginBottom: "20px",
+                                WebkitTextSecurity: "disc",
+                                textSecurity: "disc" // Standard if supported
                             }}
                         />
-                        {authError && <p style={{ color: "red", marginBottom: "15px" }}>{authError}</p>}
-                        <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-                            <button id="tutorial-parent-cancel-btn" onClick={onClose} style={{ padding: "10px 20px", borderRadius: "10px", border: "none" }}>キャンセル</button>
-                            <button id="tutorial-parent-login-btn" onClick={handleLogin} className="btn btn-primary" style={{ padding: "10px 30px" }}>OK</button>
-                        </div>
-                    </div>
-                ) : (
+
+                        {authError && <p style={{ color: "#d63031", marginBottom: "20px" }}>{authError}</p>}
+
+                        <button
+                            type="submit"
+                            className="btn"
+                            disabled={loading}
+                            style={{ width: "200px", padding: "12px", borderRadius: "10px", fontWeight: "bold" }}
+                        >
+                            {loading ? "確認中..." : "開く"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={{
+                                marginTop: "20px",
+                                background: "none",
+                                border: "none",
+                                color: "#888",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                                fontSize: "0.9rem"
+                            }}
+                        >
+                            キャンセル
+                        </button>
+                    </form>
+                )}
+                {isAuthenticated && (
                     // Settings Content
                     <div>
                         <div style={{
@@ -280,6 +428,7 @@ export default function ParentSettings({ isOpen, onClose }) {
                                 { id: "password", label: "パスワード", tid: "tutorial-tab-password" },
                                 { id: "request", label: "申請・要望", tid: "tutorial-tab-request" },
                                 { id: "affiliation", label: "所属", tid: "tutorial-tab-affiliation" },
+                                { id: "messages", label: `新着 (${unreadMessageCount})` },
                                 { id: "release", label: "更新" }
                             ].map(tab => (
                                 <button
@@ -303,7 +452,47 @@ export default function ParentSettings({ isOpen, onClose }) {
 
                         {activeTab === "quiz" && (
                             <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
-                                {/* 1. Arithmetic & Shapes */}
+                                {/* 1. Quiz Timing */}
+                                <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
+                                    <h4 style={{ margin: "0 0 15px 0", color: "#2980b9", borderBottom: "2px solid #d6eaf8", display: "inline-block" }}>⏱️ クイズのタイミング</h4>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={quizSettings.quizBeforePost !== false} // Default true
+                                                onChange={(e) => setQuizSettings({ ...quizSettings, quizBeforePost: e.target.checked })}
+                                                style={{ transform: "scale(1.3)", marginRight: "8px" }}
+                                            />
+                                            投稿の前にクイズをだす
+                                        </label>
+                                        <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={quizSettings.quizBeforeGame === true} // Default false
+                                                onChange={(e) => setQuizSettings({ ...quizSettings, quizBeforeGame: e.target.checked })}
+                                                style={{ transform: "scale(1.3)", marginRight: "8px" }}
+                                            />
+                                            ゲームの前にクイズをだす
+                                        </label>
+
+                                        <div style={{ marginTop: "10px", padding: "10px", background: "rgba(0,0,0,0.02)", borderRadius: "8px" }}>
+                                            <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>クイズの出題数 (1〜10問)</label>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="10"
+                                                    value={quizSettings.quizQuestionCount || 1}
+                                                    onChange={(e) => setQuizSettings({ ...quizSettings, quizQuestionCount: parseInt(e.target.value) })}
+                                                    style={{ flex: 1 }}
+                                                />
+                                                <span style={{ fontWeight: "bold", fontSize: "1.1rem", width: "40px", textAlign: "right" }}>{quizSettings.quizQuestionCount || 1}問</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* 2. Arithmetic & Shapes */}
                                 <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
                                     <h4 style={{ margin: "0 0 15px 0", color: "var(--primary)", borderBottom: "2px solid var(--primary-light)", display: "inline-block" }}>🔢 算数・図形</h4>
 
@@ -320,6 +509,14 @@ export default function ParentSettings({ isOpen, onClose }) {
                                     </div>
 
                                     <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>答えの最大数 (1〜100)</label>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <input type="range" min="1" max="100" value={quizSettings.maxAnswer} onChange={(e) => setQuizSettings({ ...quizSettings, maxAnswer: parseInt(e.target.value) })} style={{ flex: 1 }} />
+                                            <span style={{ fontWeight: "bold", fontSize: "1.1rem", width: "40px" }}>{quizSettings.maxAnswer}</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: "15px" }}>
                                         <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>図形（ずけい）</label>
                                         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                                             <label style={{ display: "flex", alignItems: "center", cursor: "pointer", fontSize: "0.95rem" }}>
@@ -332,17 +529,9 @@ export default function ParentSettings({ isOpen, onClose }) {
                                             </label>
                                         </div>
                                     </div>
-
-                                    <div style={{ marginBottom: "10px" }}>
-                                        <label style={{ display: "block", fontWeight: "bold", marginBottom: "8px", fontSize: "0.9rem" }}>答えの最大数 (1〜100)</label>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                            <input type="range" min="1" max="100" value={quizSettings.maxAnswer} onChange={(e) => setQuizSettings({ ...quizSettings, maxAnswer: parseInt(e.target.value) })} style={{ flex: 1 }} />
-                                            <span style={{ fontWeight: "bold", fontSize: "1.1rem", width: "40px" }}>{quizSettings.maxAnswer}</span>
-                                        </div>
-                                    </div>
                                 </section>
 
-                                {/* 2. Language */}
+                                {/* 3. Language */}
                                 <section style={{ border: "1px solid #eee", padding: "15px", borderRadius: "12px" }}>
                                     <h4 style={{ margin: "0 0 15px 0", color: "#e67e22", borderBottom: "2px solid #ffedd5", display: "inline-block" }}>📚 ことば・語彙</h4>
                                     <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
@@ -364,78 +553,86 @@ export default function ParentSettings({ isOpen, onClose }) {
                         )}
 
                         {activeTab === "time" && (
-                            <div>
-                                <h3 style={{ marginBottom: "15px" }}>おやすみモード設定</h3>
-                                <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "20px" }}>
-                                    指定した時間はアプリを使えなくします。（夜更かし防止など）
-                                </p>
-
-                                <div style={{ marginBottom: "20px" }}>
-                                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={usageLimit.enabled}
-                                            onChange={(e) => setUsageLimit({ ...usageLimit, enabled: e.target.checked })}
-                                            style={{ transform: "scale(1.5)" }}
-                                        />
-                                        機能を有効にする
-                                    </label>
-                                </div>
-
-                                {usageLimit.enabled && (
-                                    <div style={{ background: "#f8f9fa", padding: "20px", borderRadius: "10px" }}>
-                                        <div style={{ marginBottom: "15px" }}>
-                                            <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>開始時間（寝る時間）</label>
-                                            <input
-                                                type="time"
-                                                value={usageLimit.start}
-                                                onChange={(e) => setUsageLimit({ ...usageLimit, start: e.target.value })}
-                                                style={{ fontSize: "1.2rem", padding: "5px" }}
-                                            />
-                                        </div>
-                                        <div style={{ marginBottom: "15px" }}>
-                                            <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>終了時間（起きる時間）</label>
-                                            <input
-                                                type="time"
-                                                value={usageLimit.end}
-                                                onChange={(e) => setUsageLimit({ ...usageLimit, end: e.target.value })}
-                                                style={{ fontSize: "1.2rem", padding: "5px" }}
-                                            />
-                                        </div>
-                                        <p style={{ color: "red", fontSize: "0.9rem" }}>
-                                            ※ {usageLimit.start} から {usageLimit.end} の間はアプリが開けなくなります。
-                                        </p>
-                                    </div>
-                                )}
-
-
-
-                                <div style={{ marginTop: "20px", marginBottom: "20px" }}>
-                                    <h4 style={{ marginBottom: "10px" }}>🎮 ゲーム機能の設定</h4>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                                {/* 1. Sleep Mode */}
+                                <section style={{ border: "1px solid #eee", padding: "20px", borderRadius: "12px", backgroundColor: "#fff" }}>
+                                    <h3 style={{ margin: "0 0 10px 0", color: "#2c3e50", display: "flex", alignItems: "center", gap: "8px" }}>
+                                        🌙 おやすみモード
+                                    </h3>
+                                    <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "15px" }}>
+                                        指定した時間はアプリを使えなくします。（夜更かし防止など）
+                                    </p>
 
                                     <div style={{ marginBottom: "15px" }}>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.05rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={usageLimit.enabled}
+                                                onChange={(e) => setUsageLimit({ ...usageLimit, enabled: e.target.checked })}
+                                                style={{ transform: "scale(1.4)" }}
+                                            />
+                                            機能を有効にする
+                                        </label>
+                                    </div>
+
+                                    {usageLimit.enabled && (
+                                        <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "10px", marginTop: "10px" }}>
+                                            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+                                                <div style={{ flex: 1, minWidth: "140px" }}>
+                                                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "0.9rem" }}>開始時間（寝る）</label>
+                                                    <input
+                                                        type="time"
+                                                        value={usageLimit.start}
+                                                        onChange={(e) => setUsageLimit({ ...usageLimit, start: e.target.value })}
+                                                        style={{ fontSize: "1.1rem", padding: "8px", width: "100%", borderRadius: "6px", border: "1px solid #ddd" }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: "140px" }}>
+                                                    <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "0.9rem" }}>終了時間（起きる）</label>
+                                                    <input
+                                                        type="time"
+                                                        value={usageLimit.end}
+                                                        onChange={(e) => setUsageLimit({ ...usageLimit, end: e.target.value })}
+                                                        style={{ fontSize: "1.1rem", padding: "8px", width: "100%", borderRadius: "6px", border: "1px solid #ddd" }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p style={{ color: "var(--color-red)", fontSize: "0.85rem", marginTop: "10px" }}>
+                                                ※ {usageLimit.start} から {usageLimit.end} の間はアプリが開けなくなります。
+                                            </p>
+                                        </div>
+                                    )}
+                                </section>
+
+                                {/* 2. Game Features */}
+                                <section style={{ border: "1px solid #eee", padding: "20px", borderRadius: "12px", backgroundColor: "#fff" }}>
+                                    <h3 style={{ margin: "0 0 10px 0", color: "#2c3e50", display: "flex", alignItems: "center", gap: "8px" }}>
+                                        🎮 ゲーム機能
+                                    </h3>
+
+                                    <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.05rem" }}>
                                             <input
                                                 type="checkbox"
                                                 checked={gameFeatureEnabled}
                                                 onChange={(e) => setGameFeatureEnabled(e.target.checked)}
-                                                style={{ transform: "scale(1.5)" }}
+                                                style={{ transform: "scale(1.4)" }}
                                             />
-                                            ゲーム機能を有効にする
+                                            機能を有効にする
                                         </label>
-                                        <p style={{ fontSize: "0.9rem", color: "#666", marginLeft: "28px" }}>
+                                        <p style={{ fontSize: "0.9rem", color: "#666", marginLeft: "28px", marginTop: "5px" }}>
                                             チェックを外すと、ゲームの作成やプレイボタンが表示されなくなります。
                                         </p>
                                     </div>
 
                                     {gameFeatureEnabled && (
-                                        <div style={{ marginLeft: "15px", paddingLeft: "15px", borderLeft: "3px solid #eee" }}>
+                                        <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "10px", marginTop: "10px" }}>
                                             <div style={{ marginBottom: "15px" }}>
-                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>1回あたりのプレイ時間</label>
+                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "0.9rem" }}>1回あたりのプレイ時間</label>
                                                 <select
                                                     value={gameTimeLimit}
                                                     onChange={(e) => setGameTimeLimit(parseInt(e.target.value))}
-                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "5px", width: "100%" }}
+                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "6px", width: "100%", border: "1px solid #ddd" }}
                                                 >
                                                     <option value={5}>5分</option>
                                                     <option value={10}>10分</option>
@@ -447,12 +644,12 @@ export default function ParentSettings({ isOpen, onClose }) {
                                                 </select>
                                             </div>
 
-                                            <div style={{ marginBottom: "15px" }}>
-                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>1日の合計プレイ時間</label>
+                                            <div style={{ marginBottom: "0" }}>
+                                                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", fontSize: "0.9rem" }}>1日の合計プレイ時間</label>
                                                 <select
                                                     value={totalGameTimeLimit}
                                                     onChange={(e) => setTotalGameTimeLimit(parseInt(e.target.value))}
-                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "5px", width: "100%" }}
+                                                    style={{ fontSize: "1.0rem", padding: "8px", borderRadius: "6px", width: "100%", border: "1px solid #ddd" }}
                                                 >
                                                     <option value={15}>15分</option>
                                                     <option value={30}>30分</option>
@@ -464,25 +661,65 @@ export default function ParentSettings({ isOpen, onClose }) {
                                             </div>
                                         </div>
                                     )}
-                                </div>
+                                </section>
 
-                                <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #eee" }} />
+                                {/* 3. Media Features */}
+                                <section style={{ border: "1px solid #eee", padding: "20px", borderRadius: "12px", backgroundColor: "#fff" }}>
+                                    <h3 style={{ margin: "0 0 10px 0", color: "#2c3e50", display: "flex", alignItems: "center", gap: "8px" }}>
+                                        📷 画像・動画機能
+                                    </h3>
 
-                                <h3 style={{ marginBottom: "15px" }}>ペット機能</h3>
-                                <div style={{ marginBottom: "20px" }}>
-                                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.1rem" }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={showPets}
-                                            onChange={(e) => setShowPets(e.target.checked)}
-                                            style={{ transform: "scale(1.5)" }}
-                                        />
-                                        ペットを表示する
-                                    </label>
-                                    <p style={{ fontSize: "0.9rem", color: "#666", marginTop: "5px", marginLeft: "28px" }}>
-                                        チェックを外すと、ペットのお世話や表示が隠れます。
-                                    </p>
-                                </div>
+                                    <div style={{ marginBottom: "15px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.05rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={mediaUploadEnabled}
+                                                onChange={(e) => setMediaUploadEnabled(e.target.checked)}
+                                                style={{ transform: "scale(1.4)" }}
+                                            />
+                                            写真・動画の投稿を許可する
+                                        </label>
+                                        <p style={{ fontSize: "0.9rem", color: "#666", marginLeft: "28px", marginTop: "5px" }}>
+                                            チェックを外すと、カメラボタンが表示されなくなります。
+                                        </p>
+                                    </div>
+
+                                    <div style={{ marginBottom: "5px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.05rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={mediaViewEnabled}
+                                                onChange={(e) => setMediaViewEnabled(e.target.checked)}
+                                                style={{ transform: "scale(1.4)" }}
+                                            />
+                                            タイムラインでの表示を許可する
+                                        </label>
+                                        <p style={{ fontSize: "0.9rem", color: "#666", marginLeft: "28px", marginTop: "5px" }}>
+                                            チェックを外すと、他の人の投稿した画像や動画が表示されなくなります。
+                                        </p>
+                                    </div>
+                                </section>
+
+                                {/* 4. Pet Features */}
+                                <section style={{ border: "1px solid #eee", padding: "20px", borderRadius: "12px", backgroundColor: "#fff" }}>
+                                    <h3 style={{ margin: "0 0 10px 0", color: "#2c3e50", display: "flex", alignItems: "center", gap: "8px" }}>
+                                        🐶 ペット機能
+                                    </h3>
+                                    <div style={{ marginBottom: "5px" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: "bold", fontSize: "1.05rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={showPets}
+                                                onChange={(e) => setShowPets(e.target.checked)}
+                                                style={{ transform: "scale(1.4)" }}
+                                            />
+                                            ペットを表示する
+                                        </label>
+                                        <p style={{ fontSize: "0.9rem", color: "#666", marginTop: "5px", marginLeft: "28px" }}>
+                                            チェックを外すと、ペットのお世話や表示が隠れます。
+                                        </p>
+                                    </div>
+                                </section>
 
                                 <button
                                     onClick={handleSaveSettings}
@@ -500,7 +737,9 @@ export default function ParentSettings({ isOpen, onClose }) {
                                 <div style={{ marginBottom: "30px", padding: "15px", backgroundColor: "#f9f9f9", borderRadius: "10px" }}>
                                     <h4 style={{ marginBottom: "10px" }}>お子様のログインパスワード変更</h4>
                                     <input
-                                        type="text"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        name="new-child-password"
                                         placeholder="新しいパスワード（6文字以上）"
                                         value={newChildPassword}
                                         onChange={(e) => setNewChildPassword(e.target.value)}
@@ -515,7 +754,9 @@ export default function ParentSettings({ isOpen, onClose }) {
                                     <h4 style={{ marginBottom: "10px", color: "#d63031" }}>保護者用パスワード変更</h4>
                                     <p style={{ fontSize: "0.9rem", marginBottom: "10px" }}>現在の設定画面に入るためのパスワードです。</p>
                                     <input
-                                        type="text"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        name="new-parent-pin"
                                         placeholder="新しいパスワード"
                                         value={newParentPin}
                                         onChange={(e) => setNewParentPin(e.target.value)}
@@ -569,45 +810,148 @@ export default function ParentSettings({ isOpen, onClose }) {
                             <div>
                                 <h3 style={{ marginBottom: "15px" }}>所属の設定</h3>
                                 <p style={{ fontSize: "0.9rem", color: "#666", marginBottom: "20px" }}>
-                                    所属を設定すると、同じ所属のお友達やグループだけが表示されるようになります。<br />
-                                    「所属なし（共通）」を選ぶと、誰とでも交流できるパブリックエリアになります。
+                                    新しいグループに参加するには、招待コードを入力してください。<br />
+                                    参加中のグループにお友達を招待したいときは、「招待する」ボタンからコードを発行できます。
                                 </p>
 
+                                {/* Invitation Code Input */}
+                                <div style={{ marginBottom: "30px", padding: "20px", background: "#f0f8ff", borderRadius: "12px", border: "1px solid #bde0fe" }}>
+                                    <h4 style={{ margin: "0 0 10px 0", color: "#0077b6" }}>📩 招待コードを入力</h4>
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                        <input
+                                            type="text"
+                                            autoComplete="off"
+                                            name="invitation-code-input"
+                                            value={invitationCode}
+                                            onChange={(e) => setInvitationCode(e.target.value.toUpperCase())}
+                                            placeholder="例: A1B2C3"
+                                            style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "1.1rem", letterSpacing: "2px" }}
+                                        />
+                                        <button
+                                            onClick={handleJoinAffiliation}
+                                            disabled={loading || !invitationCode}
+                                            className="btn btn-primary"
+                                            style={{ padding: "10px 20px" }}
+                                        >
+                                            参加する
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <h4 style={{ marginBottom: "10px" }}>参加中の所属</h4>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                    {affiliations.map(aff => {
-                                        const isSelected = selectedAffiliation === aff.id || (!selectedAffiliation && aff.id === "default");
+                                    {selectedAffiliations.map(affId => {
+                                        // Find name from affiliations list (fetched on load)
+                                        const affData = affiliations.find(a => a.id === affId) || { name: affId === "default" ? "所属なし（共通）" : "読み込み中..." };
+
                                         return (
-                                            <label key={aff.id} style={{
-                                                display: "flex", alignItems: "center", padding: "15px",
-                                                border: `2px solid ${isSelected ? "var(--primary)" : "#eee"} `,
-                                                borderRadius: "10px", cursor: "pointer",
-                                                backgroundColor: isSelected ? "#fff9f0" : "white",
-                                                transition: "all 0.2s"
+                                            <div key={affId} style={{
+                                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                                                padding: "15px",
+                                                border: "2px solid #eee",
+                                                borderRadius: "10px",
+                                                backgroundColor: "white"
                                             }}>
-                                                <input
-                                                    type="radio"
-                                                    name="affiliation"
-                                                    value={aff.id}
-                                                    checked={isSelected}
-                                                    onChange={() => setSelectedAffiliation(aff.id)}
-                                                    style={{ marginRight: "10px", transform: "scale(1.5)" }}
-                                                />
-                                                <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{aff.name}</span>
-                                            </label>
+                                                <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{affData.name}</span>
+
+                                                {/* Actions */}
+                                                <div style={{ display: "flex", gap: "10px" }}>
+                                                    {affId !== "default" && (
+                                                        <button
+                                                            onClick={() => handleGenerateInvitation(affId)}
+                                                            className="btn"
+                                                            style={{
+                                                                background: "#e3f2fd", color: "#1976d2", border: "none",
+                                                                padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "0.9rem"
+                                                            }}
+                                                        >
+                                                            招待する
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         );
                                     })}
                                 </div>
 
-                                <button
-                                    type="button"
-                                    id="tutorial-save-affiliation-btn"
-                                    onClick={handleSaveSettings}
-                                    disabled={loading}
-                                    className="btn btn-primary"
-                                    style={{ width: "100%", padding: "12px", marginTop: "20px" }}
-                                >
-                                    設定を保存する
-                                </button>
+                                {/* Generated Code Modal/Display */}
+                                {generatedCode && (
+                                    <div
+                                        role="status"
+                                        aria-live="polite"
+                                        style={{ marginTop: "20px", padding: "15px", background: "#fff3cd", border: "1px solid #ffeeba", borderRadius: "8px", textAlign: "center" }}
+                                    >
+                                        <p style={{ margin: "0 0 5px 0", fontWeight: "bold", color: "#856404" }}>招待コードを発行しました！</p>
+                                        <p style={{ fontSize: "2rem", letterSpacing: "5px", margin: "10px 0", fontWeight: "bold" }}>
+                                            {generatedCode}
+                                        </p>
+                                        <p style={{ fontSize: "0.85rem", color: "#856404" }}>
+                                            このコードをお友達に教えてあげてください。<br />
+                                            <strong>※ 有効期限は発行から24時間です。</strong>
+                                        </p>
+                                        <button onClick={() => setGeneratedCode(null)} style={{ marginTop: "10px", background: "none", border: "none", textDecoration: "underline", cursor: "pointer" }}>閉じる</button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === "messages" && (
+                            <div>
+                                <h3 style={{ marginBottom: "15px" }}>📩 メッセージ</h3>
+                                {messages.length === 0 ? (
+                                    <div style={{ padding: "40px", textAlign: "center", color: "#666", background: "#f9f9f9", borderRadius: "10px" }}>
+                                        メッセージはありません
+                                    </div>
+                                ) : (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                        {messages.map(msg => (
+                                            <div key={msg.id} style={{
+                                                padding: "15px",
+                                                border: "2px solid #eee",
+                                                borderRadius: "15px",
+                                                backgroundColor: msg.status.read ? "white" : "#fff9db",
+                                                position: "relative",
+                                                transition: "all 0.2s"
+                                            }}>
+                                                {!msg.status.read && (
+                                                    <span style={{
+                                                        position: "absolute", top: "10px", right: "10px",
+                                                        background: "var(--color-red)", color: "white",
+                                                        fontSize: "0.7rem", padding: "2px 8px", borderRadius: "10px",
+                                                        fontWeight: "bold"
+                                                    }}>
+                                                        NEW
+                                                    </span>
+                                                )}
+                                                <h4 style={{ margin: "0 0 8px 0", paddingRight: "40px" }}>{msg.title}</h4>
+                                                <p style={{ margin: "0 0 10px 0", fontSize: "0.95rem", whiteSpace: "pre-wrap", color: "#444" }}>
+                                                    {msg.content}
+                                                </p>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #eee", paddingTop: "10px" }}>
+                                                    <span style={{ fontSize: "0.8rem", color: "#888" }}>
+                                                        {msg.createdAt?.toDate().toLocaleString() || "日時不明"}
+                                                    </span>
+                                                    <div style={{ display: "flex", gap: "10px" }}>
+                                                        {!msg.status.read && (
+                                                            <button
+                                                                onClick={() => handleReadMessage(msg.id)}
+                                                                style={{ border: "none", background: "none", color: "var(--primary)", fontWeight: "bold", cursor: "pointer", fontSize: "0.85rem" }}
+                                                            >
+                                                                既読にする
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleDeleteMessage(msg.id)}
+                                                            style={{ border: "none", background: "none", color: "#e74c3c", cursor: "pointer", fontSize: "0.85rem" }}
+                                                        >
+                                                            削除
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 

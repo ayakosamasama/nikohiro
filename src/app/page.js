@@ -15,7 +15,7 @@ import GameRequestModal from "../components/GameRequestModal";
 const APP_VERSION = "1.0.0-beta";
 
 export default function Home() {
-  const { user, login, signup } = useAuth();
+  const { user, login, signup, refreshProfile, isMaintenance } = useAuth();
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -23,7 +23,7 @@ export default function Home() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [joinedGroupIds, setJoinedGroupIds] = useState([]);
-  const [allGroups, setAllGroups] = useState([]); // For tab labels
+  const [affiliationGroups, setAffiliationGroups] = useState([]); // All groups in current affiliation
   const [filterMode, setFilterMode] = useState("all"); // 'all', 'friends', 'group'
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [activeTab, setActiveTab] = useState("home"); // 'home', 'groups', 'pet'
@@ -33,30 +33,60 @@ export default function Home() {
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [showPets, setShowPets] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [invitationCode, setInvitationCode] = useState("");
 
-  // Fetch joined groups for authenticated user
+  // Affiliation State
+  const [selectedAffiliation, setSelectedAffiliation] = useState(null);
+  const [affiliationOptions, setAffiliationOptions] = useState([]);
+
+  // Restore local subscriptions
   useEffect(() => {
     if (user) {
-      const unsubUser = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
-      const unsubGroups = subscribeToGroups((groups) => setAllGroups(groups));
+      const unsubGroups = subscribeToGroups(selectedAffiliation, (groups) => setAffiliationGroups(groups));
+      const unsubJoinedGroups = subscribeToUserGroups(user.uid, (ids) => setJoinedGroupIds(ids));
+      return () => {
+        unsubGroups();
+        unsubJoinedGroups();
+      };
+    }
+  }, [user, selectedAffiliation]);
 
-      // Check Parent Settings for Pet Visibility & Release Notes
+  // Affiliation Initialization Logic
+  useEffect(() => {
+    if (user && !selectedAffiliation) {
+      const currentAffiliations = user.affiliations || [];
+      if (currentAffiliations.length > 0) {
+        if (currentAffiliations.length === 1) {
+          setSelectedAffiliation(currentAffiliations[0]);
+        } else {
+          import("../services/affiliationService").then(({ getAffiliations }) => {
+            getAffiliations().then(all => {
+              const myAffiliations = all.filter(a => currentAffiliations.includes(a.id));
+              setAffiliationOptions(myAffiliations);
+              if (!selectedAffiliation) {
+                setSelectedAffiliation(user.affiliationId || currentAffiliations[0]);
+              }
+            }).catch(e => console.error("Home: Affiliation error", e));
+          });
+        }
+      } else {
+        setSelectedAffiliation(user.affiliationId || "default");
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
       getUserProfile(user.uid).then(profile => {
         if (profile?.settings?.showPets !== undefined) {
           setShowPets(profile.settings.showPets);
         }
-        // Auto show release notes if version differs AND tutorial is not running
-        if (profile?.lastViewedVersion !== APP_VERSION && !isTutorialOpen) {
+        if (profile?.lastViewedVersion !== APP_VERSION && !isTutorialOpen && profile) {
           setIsReleaseNotesOpen(true);
         }
       });
-
-      return () => {
-        unsubUser();
-        unsubGroups();
-      };
     }
-  }, [user]);
+  }, [user, isTutorialOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -67,6 +97,24 @@ export default function Home() {
       if (isLogin) {
         await login(email, password);
       } else {
+        // Validation for Signup
+        if (!invitationCode) {
+          setError("招待コードを入力してください（必須）");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check Invitation Code
+        // Dynamic import to avoid SSR issues or circular deps
+        const { validateInvitation } = await import("../services/invitationService");
+        const result = await validateInvitation(invitationCode);
+
+        if (!result.isValid) {
+          setError(result.error || "無効な招待コードです。");
+          setIsSubmitting(false);
+          return;
+        }
+
         const cred = await signup(email, password);
 
 
@@ -86,12 +134,17 @@ export default function Home() {
           console.error("Failed to setup default game file:", fileErr);
         }
 
-        // Save initial profile with gameUrl
+        // Save initial profile with gameUrl & Affiliation
         await updateUserProfile(cred.user.uid, {
           displayName: name,
           themeColor: "orange", // default
-          gameUrl: gameUrl || ""
+          gameUrl: gameUrl || "",
+          affiliations: [result.affiliationId],
+          affiliationId: result.affiliationId
         });
+
+        // Ensure context is updated with new profile data
+        await refreshProfile();
 
         setIsTutorialOpen(true);
       }
@@ -110,7 +163,7 @@ export default function Home() {
         console.error(err);
       }
 
-      let msg = "エラーが発生しました";
+      let msg = err.message || "エラーが発生しました";
       if (err.code === "auth/weak-password") msg = "パスワードは6文字以上にしてください";
       else if (err.code === "auth/email-already-in-use") msg = "そのメールアドレスはすでに登録されています";
       else if (err.code === "auth/invalid-email") msg = "メールアドレスの形式が正しくありません";
@@ -126,8 +179,8 @@ export default function Home() {
   };
 
   if (user) {
-    // Determine which groups are joined (for filter tabs)
-    const myGroups = allGroups.filter(g => joinedGroupIds.includes(g.id));
+    // Determine which groups are joined (those we follow)
+    const myJoinedGroups = affiliationGroups.filter(g => joinedGroupIds.includes(g.id));
 
     return (
       <div style={{ maxWidth: "600px", margin: "20px auto", paddingBottom: "50px" }}>
@@ -157,18 +210,7 @@ export default function Home() {
           }}
         />
 
-        <div style={{ textAlign: "right", marginBottom: "10px" }}>
-          <button
-            onClick={() => setIsTutorialOpen(true)}
-            style={{
-              background: "white", border: "1px solid #ddd",
-              padding: "5px 10px", borderRadius: "15px",
-              cursor: "pointer", fontSize: "0.9rem", color: "#636e72"
-            }}
-          >
-            ❓ 使い方を見る
-          </button>
-        </div>
+
 
         {/* Main Navigation (Home vs Groups) */}
         <div style={{ display: "flex", marginBottom: "20px", background: "white", borderRadius: "30px", padding: "5px", boxShadow: "var(--shadow-sm)" }}>
@@ -207,144 +249,196 @@ export default function Home() {
             >
               🐶 ペット
             </button>
+
           )}
+
+          <button
+            onClick={() => setIsTutorialOpen(true)}
+            style={{
+              padding: "10px", borderRadius: "25px", border: "none",
+              background: "transparent", color: "var(--color-grey)",
+              cursor: "pointer", fontSize: "1.2rem",
+              marginLeft: "5px"
+            }}
+            title="使い方を見る"
+          >
+            ❓
+          </button>
         </div>
 
-        {activeTab === "groups" ? (
-          <GroupList />
-        ) : activeTab === "pet" ? (
-          <div style={{ height: "calc(100vh - 200px)", background: "white", borderRadius: "20px", boxShadow: "var(--shadow-sm)" }}>
-            <PetScreen />
-          </div>
-        ) : (
-          <>
-            {/* Timeline Filter and List */}
+        {
+          activeTab === "groups" ? (
+            <GroupList />
+          ) : activeTab === "pet" ? (
+            <div style={{ height: "calc(100vh - 200px)", background: "white", borderRadius: "20px", boxShadow: "var(--shadow-sm)" }}>
+              <PetScreen />
+            </div>
+          ) : (
+            <>
+              {/* Timeline Filter and List */}
 
-            {/* Filter Tabs (Horizontal Scroll) */}
-            <div style={{ margin: "20px -20px", padding: "0 20px", overflowX: "auto", display: "flex", gap: "10px", scrollbarWidth: "none" }}>
-              <button
-                onClick={() => { setFilterMode("all"); setSelectedGroupId(null); }}
-                style={{
-                  whiteSpace: "nowrap", padding: "8px 16px", borderRadius: "20px", border: "none", fontWeight: "bold",
-                  background: filterMode === "all" ? "var(--primary)" : "#ddd",
-                  color: filterMode === "all" ? "white" : "black", cursor: "pointer"
-                }}
-              >
-                🌏 みんな
-              </button>
-              <button
-                onClick={() => { setFilterMode("friends"); setSelectedGroupId(null); }}
-                style={{
-                  whiteSpace: "nowrap", padding: "8px 16px", borderRadius: "20px", border: "none", fontWeight: "bold",
-                  background: filterMode === "friends" ? "var(--primary)" : "#ddd",
-                  color: filterMode === "friends" ? "white" : "black", cursor: "pointer"
-                }}
-              >
-                🤝 おなじグループ
-              </button>
+              {/* Row 1: Affiliations - Compact Pill Design */}
+              {affiliationOptions.length > 1 && (
+                <div className="hide-scrollbar" style={{ margin: "5px -20px 5px -20px", padding: "0 20px", overflowX: "auto", display: "flex", gap: "8px", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                  {affiliationOptions.map(aff => (
+                    <button
+                      key={aff.id}
+                      onClick={() => {
+                        setSelectedAffiliation(aff.id);
+                        setFilterMode("all");
+                        setSelectedGroupId(null);
+                      }}
+                      style={{
+                        whiteSpace: "nowrap", padding: "4px 12px", borderRadius: "15px", border: "none", fontWeight: "bold",
+                        background: (selectedAffiliation === aff.id) ? "var(--primary)" : "white",
+                        color: (selectedAffiliation === aff.id) ? "white" : "#666",
+                        border: (selectedAffiliation === aff.id) ? "none" : "1px solid #eee",
+                        cursor: "pointer", fontSize: "0.85rem",
+                        boxShadow: (selectedAffiliation === aff.id) ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
+                      }}
+                    >
+                      🏫 {aff.name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {myGroups.map(group => (
+              {/* Row 2: Group Icons - Compact Pill Design */}
+              <div className="hide-scrollbar" style={{ margin: "5px -20px 10px -20px", padding: "0 20px", overflowX: "auto", display: "flex", gap: "8px", scrollbarWidth: "none", msOverflowStyle: "none" }}>
                 <button
-                  key={group.id}
-                  onClick={() => { setFilterMode("group"); setSelectedGroupId(group.id); }}
+                  onClick={() => {
+                    setFilterMode("all");
+                    setSelectedGroupId(null);
+                  }}
                   style={{
-                    whiteSpace: "nowrap", padding: "8px 16px", borderRadius: "20px", border: "none", fontWeight: "bold",
-                    background: selectedGroupId === group.id ? group.color : "#ddd",
-                    color: selectedGroupId === group.id ? "white" : "black", cursor: "pointer",
-                    border: selectedGroupId === group.id ? "none" : `2px solid ${group.color}`
+                    whiteSpace: "nowrap", padding: "4px 12px", borderRadius: "15px", border: "none", fontWeight: "bold",
+                    background: (filterMode === "all") ? "var(--primary)" : "#eee",
+                    color: (filterMode === "all") ? "white" : "#666", cursor: "pointer", fontSize: "0.85rem",
+                    boxShadow: (filterMode === "all") ? "0 2px 4px rgba(0,0,0,0.1)" : "none"
                   }}
                 >
-                  {group.emoji} {group.name}
+                  🌏 すべてのグループ
                 </button>
-              ))}
-            </div>
 
-            <Timeline filterMode={filterMode} userGroups={joinedGroupIds} selectedGroupId={selectedGroupId} />
-          </>
-        )}
+                {myJoinedGroups
+                  .map(group => (
+                    <button
+                      key={group.id}
+                      onClick={() => { setFilterMode("group"); setSelectedGroupId(group.id); }}
+                      style={{
+                        whiteSpace: "nowrap", padding: "4px 10px", borderRadius: "15px", border: "none", fontWeight: "bold",
+                        background: selectedGroupId === group.id ? group.color : "#eee",
+                        color: selectedGroupId === group.id ? "white" : "#666", cursor: "pointer",
+                        border: selectedGroupId === group.id ? "none" : `1px solid ${group.color}44`,
+                        fontSize: "1.1rem",
+                        boxShadow: selectedGroupId === group.id ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+                        minWidth: "36px"
+                      }}
+                      title={group.name}
+                    >
+                      {group.emoji}
+                    </button>
+                  ))}
+              </div>
+
+              <Timeline
+                filterMode={filterMode}
+                userGroups={joinedGroupIds}
+                selectedGroupId={selectedGroupId}
+                selectedAffiliation={selectedAffiliation}
+              />
+            </>
+          )
+        }
 
         {/* Floating Action Button (FAB) for Post */}
-        {activeTab === "home" && (
-          <button
-            id="tutorial-post-fab"
-            onClick={() => setIsPostModalOpen(true)}
-            style={{
-              position: "fixed",
-              bottom: "30px",
-              right: "30px",
-              width: "65px",
-              height: "65px",
-              borderRadius: "50%",
-              background: "var(--primary)",
-              color: "white",
-              border: "none",
-              boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "2rem",
-              cursor: "pointer",
-              zIndex: 100,
-              transition: "transform 0.2s"
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
-            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-            title="きもちを投稿する"
-          >
-            ✏️
-          </button>
-        )}
+        {
+          activeTab === "home" && (
+            <button
+              id="tutorial-post-fab"
+              onClick={() => setIsPostModalOpen(true)}
+              style={{
+                position: "fixed",
+                bottom: "30px",
+                right: "30px",
+                width: "65px",
+                height: "65px",
+                borderRadius: "50%",
+                background: "var(--primary)",
+                color: "white",
+                border: "none",
+                boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "2rem",
+                cursor: "pointer",
+                zIndex: 100,
+                transition: "transform 0.2s"
+              }}
+              onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
+              onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+              title="きもちを投稿する"
+            >
+              ✏️
+            </button>
+          )
+        }
 
         {/* Floating Action Button (FAB) for Game */}
-        {activeTab === "home" && (
-          <button
-            id="tutorial-game-fab"
-            onClick={() => setIsGameModalOpen(true)}
-            style={{
-              position: "fixed",
-              bottom: "30px",
-              right: "110px", // Pushed further left
-              width: "65px",
-              height: "65px",
-              borderRadius: "50%",
-              background: "#9b59b6", // Purple for game
-              color: "white",
-              border: "none",
-              boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "2rem",
-              cursor: "pointer",
-              zIndex: 100,
-              transition: "transform 0.2s"
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
-            onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
-            title="ゲームをつくって！"
-          >
-            🎮
-          </button>
-        )}
+        {
+          activeTab === "home" && (
+            <button
+              id="tutorial-game-fab"
+              onClick={() => setIsGameModalOpen(true)}
+              style={{
+                position: "fixed",
+                bottom: "30px",
+                right: "110px", // Pushed further left
+                width: "65px",
+                height: "65px",
+                borderRadius: "50%",
+                background: "#9b59b6", // Purple for game
+                color: "white",
+                border: "none",
+                boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "2rem",
+                cursor: "pointer",
+                zIndex: 100,
+                transition: "transform 0.2s"
+              }}
+              onMouseDown={(e) => e.currentTarget.style.transform = "scale(0.9)"}
+              onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
+              title="ゲームをつくって！"
+            >
+              🎮
+            </button>
+          )
+        }
 
         {/* Post Modal Overlay */}
-        {isPostModalOpen && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000, padding: "20px"
-          }}>
-            <div style={{ width: "100%", maxWidth: "500px", animation: "modalIn 0.3s ease" }}>
-              <PostForm
-                userGroups={joinedGroupIds}
-                onClose={() => setIsPostModalOpen(false)}
-                onSuccess={() => setIsPostModalOpen(false)}
-                isTutorialMode={isTutorialOpen}
-              />
+        {
+          isPostModalOpen && (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 1000, padding: "20px"
+            }}>
+              <div style={{ width: "100%", maxWidth: "500px", animation: "modalIn 0.3s ease" }}>
+                <PostForm
+                  userGroups={joinedGroupIds}
+                  onClose={() => setIsPostModalOpen(false)}
+                  onSuccess={() => setIsPostModalOpen(false)}
+                  isTutorialMode={isTutorialOpen}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         <GameRequestModal
           isOpen={isGameModalOpen}
@@ -356,10 +450,13 @@ export default function Home() {
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
           }
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
         `}</style>
 
 
-      </div>
+      </div >
     );
   }
 
@@ -376,6 +473,25 @@ export default function Home() {
       <h2 style={{ color: "var(--primary)", marginBottom: "20px" }}>
         {isLogin ? "おかえりなさい！" : "はじめまして！"}
       </h2>
+
+      {isMaintenance && (
+        <div style={{
+          background: "#fff5f5",
+          border: "2px solid var(--color-red)",
+          borderRadius: "12px",
+          padding: "15px",
+          marginBottom: "20px",
+          color: "var(--color-red)",
+          fontWeight: "bold",
+          fontSize: "0.9rem",
+          animation: "pulse 2s infinite"
+        }}>
+          🚧 現在メンテナンス中です 🚧<br />
+          <span style={{ fontSize: "0.8rem", fontWeight: "normal" }}>
+            管理ユーザー以外はログインできません。
+          </span>
+        </div>
+      )}
 
       {error && <p style={{ color: "var(--color-red)", marginBottom: "10px" }}>{error}</p>}
 
@@ -394,19 +510,44 @@ export default function Home() {
           }}
         />
         {!isLogin && (
-          <input
-            type="text"
-            placeholder="おなまえ（ニックネーム）"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            style={{
-              padding: "15px",
-              borderRadius: "var(--radius-sm)",
-              border: "2px solid #ddd",
-              fontSize: "1rem"
-            }}
-          />
+          <>
+            <input
+              type="text"
+              placeholder="おなまえ（ニックネーム）"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              style={{
+                padding: "15px",
+                borderRadius: "var(--radius-sm)",
+                border: "2px solid #ddd",
+                fontSize: "1rem"
+              }}
+            />
+            <div style={{ textAlign: "left" }}>
+              <label style={{ fontSize: "0.8rem", color: "#666", fontWeight: "bold", marginLeft: "4px" }}>
+                招待コード (6桁) <span style={{ color: "red" }}>*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="例: A1B2C3"
+                value={invitationCode}
+                onChange={(e) => setInvitationCode(e.target.value.toUpperCase())}
+                required
+                maxLength={6}
+                style={{
+                  width: "100%",
+                  padding: "15px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "2px solid #ff8e53",
+                  fontSize: "1rem",
+                  letterSpacing: "2px",
+                  fontWeight: "bold",
+                  marginTop: "4px"
+                }}
+              />
+            </div>
+          </>
         )}
         <input
           type="password"
@@ -445,21 +586,7 @@ export default function Home() {
         {isLogin ? "あたらしくはじめる" : "ログインはこちら"}
       </button>
 
-      {/* Temporary Dev Button */}
-      <div style={{ marginTop: "30px", borderTop: "1px solid #eee", paddingTop: "20px" }}>
-        <button
-          onClick={async () => {
-            // We need user auth here, but this form is for unauth.
-            // Actually, this block is for unauth user.
-            // We need to add the button to the AUTHENTICATED view.
-            alert("ログインしてから押してください");
-          }}
-          style={{ fontSize: "0.8rem", color: "#ccc", background: "none", border: "none", cursor: "pointer" }}
-        >
-          開発者オプション
-        </button>
-      </div>
+
     </div>
   );
 }
-

@@ -13,12 +13,6 @@ export const getUserProfile = async (userId) => {
 
 export const updateUserProfile = async (userId, data) => {
     const docRef = doc(db, "users", userId);
-    const docSnap = await getDoc(docRef);
-
-    // Create if doesn't exist (using setDoc with merge), otherwise update
-    if (!docSnap.exists()) {
-        await setDoc(docRef, data, { merge: true });
-    } else {
-        await updateDoc(docRef, data);
-    }
+    // Direct set with merge is cleaner and safer (no read needed)
+    await setDoc(docRef, data, { merge: true });
 };
