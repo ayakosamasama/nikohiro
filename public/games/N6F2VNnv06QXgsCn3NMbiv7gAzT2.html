@@ -1,35 +1,298 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>わたしのゲーム</title>
+    <title>ほのぼのペットフレンズ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: "M PLUS Rounded 1c", sans-serif; text-align: center; padding: 20px; background-color: #f0f8ff; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { margin-bottom: 10px; color: #ff6b6b; }
-        p { font-size: 1.2rem; line-height: 1.6; }
-        .game-area { margin: 30px 0; font-size: 4rem; animation: bounce 2s infinite; }
-        button { font-size: 1.2rem; padding: 12px 30px; cursor: pointer; background: #4ecdc4; color: white; border: none; border-radius: 50px; font-weight: bold; transition: transform 0.1s; }
-        button:active { transform: scale(0.95); }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-    </style>
-    <!-- Font for cute look -->
-    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
-</head>
-<body>
-    <div class="container">
-        <h1>🎮 わたしのゲーム</h1>
-        <p>ここは あなただけの ゲームページだよ。<br>まだ ゲームは できていないみたい。</p>
-        
-        <div class="game-area">🚧</div>
-        
-        <p>「ゲームを つくる」ボタンから<br>リクエストを おくってみてね！</p>
-        
-        <button onclick="alert('リクエストしてね！')">わかった！</button>
-    </div>
+        @import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap');
 
-    <!-- Game Guard (Play Time Limit) -->
-    <script src="/scripts/game-guard.js"></script>
+        body {
+            font-family: 'Kiwi Maru', serif;
+            background-color: #fffaf0;
+        }
+
+        .pet-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .pet-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .heart-animation {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-50px) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .tab-active {
+            border-bottom: 4px solid #fbbf24;
+            color: #b45309;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #fffaf0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #fcd34d;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen pb-20">
+
+    <!-- ヘッダー -->
+    <header class="bg-amber-100 p-4 sticky top-0 z-50 shadow-sm border-b border-amber-200">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-amber-800 flex items-center gap-2">
+                <span>🐾</span> ほのぼのペットフレンズ
+            </h1>
+            <div class="bg-white px-4 py-2 rounded-full border-2 border-amber-400 flex items-center gap-2 shadow-inner">
+                <span class="text-xl">💰</span>
+                <span id="coin-balance" class="text-xl font-bold text-amber-700">0</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4">
+        <!-- ナビゲーションタブ -->
+        <div class="flex mb-6 bg-white rounded-xl shadow-sm overflow-hidden border border-amber-100">
+            <button onclick="switchTab('shop')" id="tab-shop"
+                class="flex-1 py-4 font-bold text-lg transition-colors tab-active">
+                🛒 ペットショップ
+            </button>
+            <button onclick="switchTab('collection')" id="tab-collection"
+                class="flex-1 py-4 font-bold text-lg transition-colors text-amber-600 hover:bg-amber-50">
+                🏠 コレクション (<span id="collection-count">0</span>)
+            </button>
+        </div>
+
+        <!-- メッセージ表示エリア -->
+        <div id="message-container" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none"></div>
+
+        <!-- ショップ画面 -->
+        <div id="view-shop" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- ショップアイテムはJSで生成 -->
+        </div>
+
+        <!-- コレクション画面 (初期は非表示) -->
+        <div id="view-collection" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- コレクションアイテムはJSで生成 -->
+        </div>
+    </main>
+
+    <!-- フッター/インフォ -->
+    <footer class="fixed bottom-0 w-full bg-white border-t border-amber-100 p-4 text-center text-amber-800 text-sm">
+        ペットをタップして「なでなで」するとコインがもらえるよ！
+    </footer>
+
+    <script>
+        // ゲームデータ
+        const PET_DATA = [
+            { id: 1, name: 'しばいぬ', price: 100, emoji: '🐕', rarity: 'Common', income: 5, color: 'bg-orange-50' },
+            { id: 2, name: 'みけねこ', price: 150, emoji: '🐈', rarity: 'Common', income: 8, color: 'bg-stone-50' },
+            { id: 3, name: 'ゴールデンハム', price: 80, emoji: '🐹', rarity: 'Common', income: 3, color: 'bg-yellow-50' },
+            { id: 4, name: 'うさぎさん', price: 200, emoji: '🐇', rarity: 'Rare', income: 15, color: 'bg-rose-50' },
+            { id: 5, name: 'オカメインコ', price: 180, emoji: '🦜', rarity: 'Rare', income: 12, color: 'bg-emerald-50' },
+            { id: 6, name: 'ペンギン', price: 500, emoji: '🐧', rarity: 'Super Rare', income: 40, color: 'bg-blue-50' },
+            { id: 7, name: 'パンダ', price: 1000, emoji: '🐼', rarity: 'Super Rare', income: 100, color: 'bg-gray-50' },
+            { id: 8, name: 'ユニコーン', price: 5000, emoji: '🦄', rarity: 'Legendary', income: 500, color: 'bg-purple-50' },
+            { id: 9, name: 'ドラゴン', price: 9999, emoji: '🐲', rarity: 'Legendary', income: 1000, color: 'bg-red-50' }
+        ];
+
+        // 状態管理
+        let state = {
+            coins: 200, // 初期コイン
+            myPets: []  // 購入したペットのIDリスト
+        };
+
+        // 初期化
+        window.onload = () => {
+            renderShop();
+            renderCollection();
+            updateStats();
+        };
+
+        // UI更新: 統計
+        function updateStats() {
+            document.getElementById('coin-balance').innerText = state.coins.toLocaleString();
+            document.getElementById('collection-count').innerText = state.myPets.length;
+            renderShop(); // 購入可能状態を更新するために再描画
+        }
+
+        // タブ切り替え
+        function switchTab(tab) {
+            const shopView = document.getElementById('view-shop');
+            const collectionView = document.getElementById('view-collection');
+            const shopTab = document.getElementById('tab-shop');
+            const collectionTab = document.getElementById('tab-collection');
+
+            if (tab === 'shop') {
+                shopView.classList.remove('hidden');
+                collectionView.classList.add('hidden');
+                shopTab.classList.add('tab-active');
+                collectionTab.classList.remove('tab-active');
+                renderShop();
+            } else {
+                shopView.classList.add('hidden');
+                collectionView.classList.remove('hidden');
+                shopTab.classList.remove('tab-active');
+                collectionTab.classList.add('tab-active');
+                renderCollection();
+            }
+        }
+
+        // ショップ描画
+        function renderShop() {
+            const container = document.getElementById('view-shop');
+            container.innerHTML = '';
+
+            PET_DATA.forEach(pet => {
+                const isOwned = state.myPets.includes(pet.id);
+                const canAfford = state.coins >= pet.price;
+
+                const card = document.createElement('div');
+                card.className = `pet-card bg-white rounded-2xl p-6 shadow-md border-2 ${isOwned ? 'border-gray-200 opacity-75' : 'border-amber-100'}`;
+
+                card.innerHTML = `
+                    <div class="text-6xl mb-4 text-center">${pet.emoji}</div>
+                    <div class="text-center">
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${getRarityClass(pet.rarity)}">${pet.rarity}</span>
+                        <h3 class="text-xl font-bold text-amber-900 mt-2">${pet.name}</h3>
+                        <p class="text-amber-600 text-sm mt-1">なでなで: +${pet.income}コイン</p>
+                        <div class="mt-4">
+                            ${isOwned ?
+                        `<button disabled class="w-full bg-gray-100 text-gray-400 py-2 rounded-xl font-bold">お迎え済み</button>` :
+                        `<button onclick="buyPet(${pet.id})" 
+                                    class="w-full ${canAfford ? 'bg-amber-400 hover:bg-amber-500 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} 
+                                    py-2 rounded-xl font-bold transition-colors">
+                                    💰 ${pet.price.toLocaleString()}
+                                </button>`
+                    }
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // コレクション描画
+        function renderCollection() {
+            const container = document.getElementById('view-collection');
+            container.innerHTML = '';
+
+            if (state.myPets.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-20 text-center">
+                        <p class="text-amber-400 text-5xl mb-4">🏠</p>
+                        <p class="text-amber-800 font-bold text-xl">まだペットがいません</p>
+                        <p class="text-amber-600">ショップでお迎えしてみましょう！</p>
+                    </div>
+                `;
+                return;
+            }
+
+            state.myPets.forEach(petId => {
+                const pet = PET_DATA.find(p => p.id === petId);
+                const card = document.createElement('div');
+                card.className = `pet-card ${pet.color} rounded-2xl p-6 shadow-md border-2 border-white relative overflow-hidden cursor-pointer select-none`;
+                card.onclick = (e) => petAnimal(e, pet);
+
+                card.innerHTML = `
+                    <div class="text-6xl mb-4 text-center transform transition-transform hover:scale-110">${pet.emoji}</div>
+                    <div class="text-center">
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${getRarityClass(pet.rarity)}">${pet.rarity}</span>
+                        <h3 class="text-xl font-bold text-amber-900 mt-2">${pet.name}</h3>
+                        <p class="text-xs text-amber-400 mt-2">クリックしてなでなで！</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ペット購入
+        function buyPet(id) {
+            const pet = PET_DATA.find(p => p.id === id);
+            if (state.coins >= pet.price && !state.myPets.includes(id)) {
+                state.coins -= pet.price;
+                state.myPets.push(id);
+                updateStats();
+                showMessage(`${pet.name}がお家に来ました！✨`);
+            } else if (state.coins < pet.price) {
+                showMessage(`コインが足りません...😢`);
+            }
+        }
+
+        // なでなで（コイン獲得）
+        function petAnimal(event, pet) {
+            // コイン加算
+            state.coins += pet.income;
+            updateStats();
+
+            // ハートとテキストのエフェクト
+            const rect = event.currentTarget.getBoundingClientRect();
+            createFloatingEffect(event.clientX, event.clientY, '❤️');
+            createFloatingEffect(event.clientX, event.clientY - 20, `+${pet.income}`, 'text-amber-600 font-bold');
+        }
+
+        // エフェクト生成
+        function createFloatingEffect(x, y, content, className = "") {
+            const el = document.createElement('div');
+            el.className = `heart-animation fixed z-50 pointer-events-none ${className}`;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.innerText = content;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // メッセージ表示
+        function showMessage(text) {
+            const container = document.getElementById('message-container');
+            const msg = document.createElement('div');
+            msg.className = "bg-amber-800 text-white px-6 py-3 rounded-full shadow-lg mb-2 animate-bounce flex items-center gap-2";
+            msg.innerHTML = `<span>🔔</span> ${text}`;
+            container.appendChild(msg);
+            setTimeout(() => {
+                msg.style.opacity = '0';
+                msg.style.transition = 'opacity 0.5s';
+                setTimeout(() => msg.remove(), 500);
+            }, 2000);
+        }
+
+        // レア度に応じたクラス
+        function getRarityClass(rarity) {
+            switch (rarity) {
+                case 'Common': return 'bg-gray-100 text-gray-600';
+                case 'Rare': return 'bg-blue-100 text-blue-600';
+                case 'Super Rare': return 'bg-purple-100 text-purple-600';
+                case 'Legendary': return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
+                default: return 'bg-gray-100';
+            }
+        }
+    </script>
 </body>
+
 </html>
