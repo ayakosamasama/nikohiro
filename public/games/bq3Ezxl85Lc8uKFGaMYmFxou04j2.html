@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麗しのシンデレラライフ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Shippori+Mincho', serif;
+            background: linear-gradient(135deg, #fff5f7 0%, #fce4ec 100%);
+            color: #4a4a4a;
+        }
+
+        .gold-border {
+            border: 2px solid #d4af37;
+        }
+
+        .premium-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(212, 175, 55, 0.1);
+        }
+
+        .btn-action {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+        .tab-active {
+            background-color: #d4af37;
+            color: white;
+        }
+
+        @keyframes sparkle {
+            0% {
+                opacity: 0;
+                transform: scale(0);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 0;
+                transform: scale(0);
+            }
+        }
+
+        .sparkle-el {
+            position: absolute;
+            pointer-events: none;
+            animation: sparkle 0.8s ease-in-out forwards;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen pb-24">
+
+    <!-- ヘッダー：ステータス -->
+    <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-pink-100 p-4 shadow-sm">
+        <div class="max-w-2xl mx-auto">
+            <div class="flex justify-between items-center mb-2">
+                <div>
+                    <h1 class="text-xl font-bold text-pink-600">💍 麗しのシンデレラ</h1>
+                    <p class="text-xs text-pink-400">淑女の階段を登りましょう</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-lg font-bold text-amber-600">💰 <span id="money">0</span>円</p>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <div class="flex justify-between text-xs font-bold">
+                    <span>Lv.<span id="level">1</span> <span id="rank-name">見習い淑女</span></span>
+                    <span>次まで: <span id="xp">0</span> / <span id="next-xp">100</span> XP</span>
+                </div>
+                <div class="w-full bg-pink-100 h-2 rounded-full overflow-hidden">
+                    <div id="xp-bar" class="progress-bar bg-pink-500 h-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto p-4">
+
+        <!-- 現在の状況 -->
+        <section class="premium-card p-6 mb-6 gold-border flex items-center gap-4">
+            <div class="text-5xl" id="house-emoji">🛖</div>
+            <div class="flex-1">
+                <h2 class="text-sm font-bold text-gray-500">現在の住まい</h2>
+                <p class="text-lg font-bold" id="house-name">実家の物置</p>
+                <div class="mt-2 text-sm">
+                    <span class="text-pink-500 font-bold">夫: </span>
+                    <span id="husband-name">独身</span>
+                </div>
+            </div>
+            <div id="passive-income"
+                class="text-xs bg-pink-50 px-3 py-1 rounded-full border border-pink-200 text-pink-700">
+                お小遣い: +0円/秒
+            </div>
+        </section>
+
+        <!-- タブ切り替え -->
+        <nav class="flex gap-2 mb-6">
+            <button onclick="switchTab('work')" id="tab-work"
+                class="flex-1 py-3 rounded-xl font-bold border-2 border-amber-500 text-amber-700 transition-all tab-active">🧹
+                家事</button>
+            <button onclick="switchTab('marriage')" id="tab-marriage"
+                class="flex-1 py-3 rounded-xl font-bold border-2 border-amber-500 text-amber-700 transition-all">💍
+                結婚</button>
+            <button onclick="switchTab('shop')" id="tab-shop"
+                class="flex-1 py-3 rounded-xl font-bold border-2 border-amber-500 text-amber-700 transition-all">🛍️
+                買い物</button>
+        </nav>
+
+        <!-- メインコンテンツエリア -->
+        <div id="view-work" class="space-y-4">
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="doWork('cleaning')"
+                    class="btn-action premium-card p-6 flex items-center justify-between hover:bg-white active:bg-pink-50 group border-2 border-transparent hover:border-pink-200">
+                    <div class="flex items-center gap-4">
+                        <span class="text-4xl group-hover:rotate-12 transition-transform">🧹</span>
+                        <div class="text-left">
+                            <h3 class="font-bold">念入りな掃除</h3>
+                            <p class="text-xs text-gray-500">XPと少しのお金を獲得</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-pink-600 font-bold">+5 XP</p>
+                        <p class="text-amber-600 text-sm font-bold">+100円</p>
+                    </div>
+                </button>
+
+                <button onclick="doWork('cooking')"
+                    class="btn-action premium-card p-6 flex items-center justify-between hover:bg-white active:bg-pink-50 group border-2 border-transparent hover:border-pink-200">
+                    <div class="flex items-center gap-4">
+                        <span class="text-4xl group-hover:rotate-12 transition-transform">🍳</span>
+                        <div class="text-left">
+                            <h3 class="font-bold">凝った家庭料理</h3>
+                            <p class="text-xs text-gray-500">女子力を高める</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-pink-600 font-bold">+12 XP</p>
+                        <p class="text-amber-600 text-sm font-bold">+250円</p>
+                    </div>
+                </button>
+
+                <button onclick="doWork('etiquette')"
+                    class="btn-action premium-card p-6 flex items-center justify-between hover:bg-white active:bg-pink-50 group border-2 border-transparent hover:border-pink-200">
+                    <div class="flex items-center gap-4">
+                        <span class="text-4xl group-hover:rotate-12 transition-transform">💃</span>
+                        <div class="text-left">
+                            <h3 class="font-bold">マナーの習得</h3>
+                            <p class="text-xs text-gray-500">XPを大幅に獲得</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-pink-600 font-bold">+30 XP</p>
+                        <p class="text-amber-600 text-sm font-bold">+50円</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div id="view-marriage" class="hidden space-y-4">
+            <h2 class="font-bold text-center text-pink-700">運命の出会い</h2>
+            <div id="husband-list" class="space-y-4">
+                <!-- JSで生成 -->
+            </div>
+        </div>
+
+        <div id="view-shop" class="hidden space-y-6">
+            <div>
+                <h2 class="font-bold text-pink-700 mb-3">🏡 不動産（レベルアップ効率UP）</h2>
+                <div id="house-list" class="space-y-3">
+                    <!-- JSで生成 -->
+                </div>
+            </div>
+            <div>
+                <h2 class="font-bold text-pink-700 mb-3">💎 アクセサリー・コレクション</h2>
+                <div id="accessory-list" class="grid grid-cols-2 gap-3">
+                    <!-- JSで生成 -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- メッセージ通知 -->
+    <div id="toast"
+        class="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-opacity">
+        <div class="bg-gray-800/90 text-white px-6 py-2 rounded-full shadow-lg text-sm" id="toast-text"></div>
+    </div>
+
+    <script>
+        // ゲーム設定データ
+        const HUSBANDS = [
+            { id: 0, name: "独身", req: 0, income: 0, emoji: "👤" },
+            { id: 1, name: "近所の優しい青年", req: 2, income: 50, emoji: "🧒" },
+            { id: 2, name: "地元の中堅企業社員", req: 5, income: 200, emoji: "👔" },
+            { id: 3, name: "やり手の若手起業家", req: 10, income: 1000, emoji: "🕶️" },
+            { id: 4, name: "代々続く名家の子息", req: 20, income: 5000, emoji: "🤵" },
+            { id: 5, name: "カリスマIT長者", req: 35, income: 20000, emoji: "📱" },
+            { id: 6, name: "アラブの石油王", req: 50, income: 100000, emoji: "👳" },
+            { id: 7, name: "伝説の国の王子様", req: 80, income: 1000000, emoji: "🤴" }
+        ];
+
+        const HOUSES = [
+            { id: 1, name: "実家の物置", price: 0, xpMult: 1, emoji: "🛖" },
+            { id: 2, name: "駅近1Kアパート", price: 50000, xpMult: 1.2, emoji: "🏢" },
+            { id: 3, name: "新築タワーマンション", price: 2000000, xpMult: 2, emoji: "🏙️" },
+            { id: 4, name: "都内の一等地豪邸", price: 50000000, xpMult: 5, emoji: "🏠" },
+            { id: 5, name: "湖畔のプライベート宮殿", price: 1000000000, xpMult: 10, emoji: "🏰" }
+        ];
+
+        const ACCESSORIES = [
+            { id: 1, name: "パールのピアス", price: 10000, emoji: "👂" },
+            { id: 2, name: "純金のネックレス", price: 50000, emoji: "📿" },
+            { id: 3, name: "ハイブランドのバッグ", price: 300000, emoji: "👜" },
+            { id: 4, name: "最高級の毛皮コート", price: 1500000, emoji: "🧥" },
+            { id: 5, name: "伝説のティアラ", price: 10000000, emoji: "👑" }
+        ];
+
+        // ゲーム状態
+        let state = {
+            money: 0,
+            xp: 0,
+            level: 1,
+            husbandId: 0,
+            houseId: 1,
+            myAccessories: [], // IDの配列
+            lastTick: Date.now()
+        };
+
+        // 初期化
+        window.onload = () => {
+            loadGame();
+            updateUI();
+            setInterval(gameLoop, 1000);
+        };
+
+        function getNextXP(lv) {
+            return Math.floor(100 * Math.pow(1.5, lv - 1));
+        }
+
+        function getRankName(lv) {
+            if (lv < 5) return "見習い淑女";
+            if (lv < 10) return "可憐な乙女";
+            if (lv < 20) return "都会の華";
+            if (lv < 40) return "社交界の憧れ";
+            if (lv < 60) return "気高き公爵夫人";
+            return "永遠のプリンセス";
+        }
+
+        function doWork(type) {
+            const house = HOUSES.find(h => h.id === state.houseId);
+            let gainXP = 0;
+            let gainMoney = 0;
+
+            if (type === 'cleaning') { gainXP = 5; gainMoney = 100; }
+            if (type === 'cooking') { gainXP = 12; gainMoney = 250; }
+            if (type === 'etiquette') { gainXP = 30; gainMoney = 50; }
+
+            state.xp += gainXP * house.xpMult;
+            state.money += gainMoney;
+
+            checkLevelUp();
+            updateUI();
+            createSparkle(event.clientX, event.clientY);
+        }
+
+        function checkLevelUp() {
+            let next = getNextXP(state.level);
+            while (state.xp >= next) {
+                state.xp -= next;
+                state.level++;
+                next = getNextXP(state.level);
+                showToast(`レベルアップ！ Lv.${state.level} になりました✨`);
+            }
+        }
+
+        function gameLoop() {
+            const husband = HUSBANDS.find(h => h.id === state.husbandId);
+            if (husband.income > 0) {
+                state.money += husband.income;
+                updateUI();
+            }
+        }
+
+        function switchTab(tab) {
+            ['work', 'marriage', 'shop'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active');
+
+            if (tab === 'marriage') renderMarriage();
+            if (tab === 'shop') renderShop();
+        }
+
+        function renderMarriage() {
+            const container = document.getElementById('husband-list');
+            container.innerHTML = '';
+
+            HUSBANDS.forEach(h => {
+                if (h.id === 0) return;
+                const isCurrent = state.husbandId === h.id;
+                const isUnlocked = state.level >= h.req;
+
+                const card = document.createElement('div');
+                card.className = `premium-card p-4 flex items-center justify-between border-2 ${isCurrent ? 'border-pink-500 bg-pink-50' : 'border-transparent'}`;
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-4xl ${isUnlocked ? '' : 'filter grayscale opacity-30'}">${h.emoji}</span>
+                        <div>
+                            <p class="font-bold ${isUnlocked ? '' : 'text-gray-400'}">${isUnlocked ? h.name : '???'}</p>
+                            <p class="text-xs text-pink-600">お小遣い: +${h.income.toLocaleString()}円/秒</p>
+                            <p class="text-[10px] text-gray-400">必要レベル: Lv.${h.req}</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${isCurrent ?
+                        '<span class="text-xs font-bold text-pink-500">成婚中💍</span>' :
+                        (isUnlocked ?
+                            `<button onclick="marry(${h.id})" class="bg-pink-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-md hover:bg-pink-600">結婚する</button>` :
+                            '<span class="text-xs text-gray-400">レベル不足</span>'
+                        )
+                    }
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function marry(id) {
+            const h = HUSBANDS.find(hus => hus.id === id);
+            state.husbandId = id;
+            showToast(`${h.name}様とご成婚されました！💍✨`);
+            updateUI();
+            renderMarriage();
+        }
+
+        function renderShop() {
+            // 住まいリスト
+            const hContainer = document.getElementById('house-list');
+            hContainer.innerHTML = '';
+            HOUSES.forEach(h => {
+                const isOwned = state.houseId === h.id;
+                const canAfford = state.money >= h.price;
+                const alreadyBetter = state.houseId > h.id;
+
+                const card = document.createElement('div');
+                card.className = `premium-card p-4 flex items-center justify-between ${isOwned ? 'bg-amber-50 border border-amber-300' : ''}`;
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl">${h.emoji}</span>
+                        <div>
+                            <p class="font-bold text-sm">${h.name}</p>
+                            <p class="text-[10px] text-amber-600">XP獲得量: x${h.xpMult}</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${isOwned ?
+                        '<span class="text-xs font-bold text-amber-600">現在の住まい</span>' :
+                        (alreadyBetter ? '-' : `<button onclick="buyHouse(${h.id})" class="${canAfford ? 'bg-amber-500' : 'bg-gray-300'} text-white px-3 py-1 rounded-lg text-xs font-bold">${h.price.toLocaleString()}円</button>`)
+                    }
+                    </div>
+                `;
+                hContainer.appendChild(card);
+            });
+
+            // アクセサリーリスト
+            const aContainer = document.getElementById('accessory-list');
+            aContainer.innerHTML = '';
+            ACCESSORIES.forEach(a => {
+                const isOwned = state.myAccessories.includes(a.id);
+                const canAfford = state.money >= a.price;
+
+                const card = document.createElement('div');
+                card.className = `premium-card p-3 text-center flex flex-col items-center gap-1 ${isOwned ? 'bg-pink-50 border border-pink-200' : ''}`;
+                card.innerHTML = `
+                    <span class="text-3xl mb-1">${a.emoji}</span>
+                    <p class="text-[10px] font-bold h-8 flex items-center">${a.name}</p>
+                    <div class="mt-auto w-full">
+                        ${isOwned ?
+                        '<span class="text-[10px] text-pink-500 font-bold">所有済み</span>' :
+                        `<button onclick="buyAccessory(${a.id})" class="w-full ${canAfford ? 'bg-pink-400' : 'bg-gray-300'} text-white py-1 rounded text-[10px] font-bold">${a.price.toLocaleString()}円</button>`
+                    }
+                    </div>
+                `;
+                aContainer.appendChild(card);
+            });
+        }
+
+        function buyHouse(id) {
+            const h = HOUSES.find(house => house.id === id);
+            if (state.money >= h.price) {
+                state.money -= h.price;
+                state.houseId = id;
+                showToast(`新しいお家「${h.name}」にお引越ししました！🏠`);
+                updateUI();
+                renderShop();
+            }
+        }
+
+        function buyAccessory(id) {
+            const a = ACCESSORIES.find(acc => acc.id === id);
+            if (state.money >= a.price) {
+                state.money -= a.price;
+                state.myAccessories.push(id);
+                showToast(`${a.name}を手に入れました！💎`);
+                updateUI();
+                renderShop();
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('money').innerText = Math.floor(state.money).toLocaleString();
+            document.getElementById('level').innerText = state.level;
+            document.getElementById('xp').innerText = Math.floor(state.xp);
+            const next = getNextXP(state.level);
+            document.getElementById('next-xp').innerText = next;
+            document.getElementById('rank-name').innerText = getRankName(state.level);
+            document.getElementById('xp-bar').style.width = `${(state.xp / next) * 100}%`;
+
+            const husband = HUSBANDS.find(h => h.id === state.husbandId);
+            document.getElementById('husband-name').innerText = husband.name;
+            document.getElementById('passive-income').innerText = `お小遣い: +${husband.income.toLocaleString()}円/秒`;
+
+            const house = HOUSES.find(h => h.id === state.houseId);
+            document.getElementById('house-name').innerText = house.name;
+            document.getElementById('house-emoji').innerText = house.emoji;
+
+            saveGame();
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 3000);
+        }
+
+        function createSparkle(x, y) {
+            for (let i = 0; i < 5; i++) {
+                const s = document.createElement('div');
+                s.className = 'sparkle-el';
+                s.innerHTML = '✨';
+                s.style.left = `${x + (Math.random() - 0.5) * 60}px`;
+                s.style.top = `${y + (Math.random() - 0.5) * 60}px`;
+                s.style.fontSize = `${10 + Math.random() * 15}px`;
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 800);
+            }
+        }
+
+        function saveGame() {
+            localStorage.setItem('cinderella_save', JSON.stringify(state));
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('cinderella_save');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state = { ...state, ...parsed };
+            }
+        }
+    </script>
+</body>
+
+</html>
